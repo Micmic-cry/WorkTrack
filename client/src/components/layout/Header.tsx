@@ -99,7 +99,7 @@ const Header = ({ toggleSidebar, isAdminView = false }: HeaderProps) => {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer" onClick={() => setLocation("/settings")}>
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setLocation("/profile")}>
                   Profile
                 </DropdownMenuItem>
                 {user?.role === "Admin" && (

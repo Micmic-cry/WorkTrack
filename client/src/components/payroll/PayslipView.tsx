@@ -1,4 +1,5 @@
 import React from "react";
+import jsPDF from "jspdf";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PDFDownloadButton, ExcelDownloadButton } from "@/components/ui/download-button";
@@ -37,10 +38,83 @@ interface PayslipProps {
 }
 
 const PayslipView: React.FC<PayslipProps> = ({ payslip, onClose }) => {
+  console.log('PayslipView received payslip:', payslip);
+  if (!payslip) {
+    return <div className="p-6 text-center text-red-500">No payslip data available.</div>;
+  }
+
   // Function to generate PDF data - would normally connect to an API
   const generatePDF = async () => {
-    // Simulate API call by returning a placeholder
-    return "PDF_DATA"; // In a real app, this would be a base64 string or binary data from an API
+    const doc = new jsPDF();
+    // Title
+    doc.setFontSize(22);
+    doc.setTextColor(33, 150, 243); // Blue
+    doc.text("PAYSLIP", 10, 18);
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    // Pay Period
+    doc.text(`Pay Period: ${String(payslip.payPeriodStart ?? '')} - ${String(payslip.payPeriodEnd ?? '')}`, 10, 28);
+    // Employee Info
+    doc.text(`Employee: ${String(payslip.employeeName ?? '')}`, 10, 38);
+    doc.text(`Position: ${String(payslip.position ?? 'Not specified')}`, 10, 46);
+    doc.text(`Department: ${String(payslip.department ?? 'Not specified')}`, 10, 54);
+    doc.text(`Pay Date: ${String(payslip.payDate ?? '-')}`, 140, 38);
+    doc.text(`Employee ID: ${String(payslip.employeeId ?? '')}`, 140, 46);
+    // Earnings Table
+    let y = 64;
+    doc.setFontSize(14);
+    doc.text("Earnings", 10, y);
+    doc.setFontSize(12);
+    y += 6;
+    doc.text("Description", 10, y);
+    doc.text("Amount", 70, y);
+    y += 6;
+    doc.text("Regular Pay", 10, y);
+    doc.text(String(payslip.regularPay ?? ''), 70, y);
+    if (payslip.overtimePay > 0) { y += 6; doc.text("Overtime Pay", 10, y); doc.text(String(payslip.overtimePay ?? ''), 70, y); }
+    if (payslip.holidayPay > 0) { y += 6; doc.text("Holiday Pay", 10, y); doc.text(String(payslip.holidayPay ?? ''), 70, y); }
+    if (payslip.allowances > 0) { y += 6; doc.text("Allowances", 10, y); doc.text(String(payslip.allowances ?? ''), 70, y); }
+    if (payslip.bonuses > 0) { y += 6; doc.text("Bonuses", 10, y); doc.text(String(payslip.bonuses ?? ''), 70, y); }
+    y += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.text("Gross Pay", 10, y);
+    doc.text(String(payslip.grossPay ?? ''), 70, y);
+    doc.setFont('helvetica', 'normal');
+    // Deductions Table
+    y = 64;
+    doc.setFontSize(14);
+    doc.text("Deductions", 110, y);
+    doc.setFontSize(12);
+    y += 6;
+    doc.text("Description", 110, y);
+    doc.text("Amount", 170, y);
+    y += 6;
+    if (payslip.sssDeduction > 0) { doc.text("SSS", 110, y); doc.text(String(payslip.sssDeduction ?? ''), 170, y); y += 6; }
+    if (payslip.phicDeduction > 0) { doc.text("PhilHealth", 110, y); doc.text(String(payslip.phicDeduction ?? ''), 170, y); y += 6; }
+    if (payslip.hdmfDeduction > 0) { doc.text("Pag-IBIG", 110, y); doc.text(String(payslip.hdmfDeduction ?? ''), 170, y); y += 6; }
+    if (payslip.taxDeduction > 0) { doc.text("Tax", 110, y); doc.text(String(payslip.taxDeduction ?? ''), 170, y); y += 6; }
+    if (payslip.loans > 0) { doc.text("Loans", 110, y); doc.text(String(payslip.loans ?? ''), 170, y); y += 6; }
+    if (payslip.cashAdvances > 0) { doc.text("Cash Advances", 110, y); doc.text(String(payslip.cashAdvances ?? ''), 170, y); y += 6; }
+    if (payslip.otherDeductions > 0) { doc.text("Other Deductions", 110, y); doc.text(String(payslip.otherDeductions ?? ''), 170, y); y += 6; }
+    doc.setFont('helvetica', 'bold');
+    doc.text("Total Deductions", 110, y);
+    doc.text(String(payslip.totalDeductions ?? ''), 170, y);
+    doc.setFont('helvetica', 'normal');
+    // Net Pay Summary
+    y += 14;
+    doc.setFillColor(33, 150, 243, 0.1);
+    doc.rect(10, y, 190, 12, 'F');
+    doc.setFontSize(16);
+    doc.setTextColor(33, 150, 243);
+    doc.text("Net Pay", 14, y + 9);
+    doc.setFontSize(18);
+    doc.text(String(payslip.netPay ?? ''), 60, y + 9);
+    doc.setTextColor(0, 0, 0);
+    // Footer
+    doc.setFontSize(10);
+    doc.text("This is a computer-generated document. No signature is required.", 10, 280);
+    doc.save(`payslip-${payslip.employeeName}-${payslip.payPeriodEnd}.pdf`);
+    return "PDF generated";
   };
 
   // Function to generate Excel data - would normally connect to an API

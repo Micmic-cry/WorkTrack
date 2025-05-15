@@ -6,19 +6,24 @@ import { Card } from "@/components/ui/card";
 import CompanyList from "@/components/companies/CompanyList";
 import CompanyForm from "@/components/companies/CompanyForm";
 import { Plus, Search } from "lucide-react";
+import { Company } from "@shared/schema";
 
 const Companies = () => {
   const [isAddingCompany, setIsAddingCompany] = useState(false);
+  const [isEditingCompany, setIsEditingCompany] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ['/api/companies'],
   });
 
-  const filteredCompanies = companies?.filter((company) =>
-    company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    company.contactPerson.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCompanies = Array.isArray(companies)
+    ? companies.filter((company: Company) =>
+        company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        company.contactPerson.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -39,7 +44,7 @@ const Companies = () => {
         </div>
       </div>
 
-      {isAddingCompany ? (
+      {isAddingCompany && (
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">Add New Company</h3>
           <CompanyForm
@@ -47,7 +52,20 @@ const Companies = () => {
             onSubmit={() => setIsAddingCompany(false)}
           />
         </Card>
-      ) : (
+      )}
+
+      {isEditingCompany && selectedCompany && (
+        <Card className="p-6">
+          <h3 className="text-lg font-medium mb-4">Edit Company</h3>
+          <CompanyForm
+            companyId={selectedCompany.id}
+            onCancel={() => { setIsEditingCompany(false); setSelectedCompany(null); }}
+            onSubmit={() => { setIsEditingCompany(false); setSelectedCompany(null); }}
+          />
+        </Card>
+      )}
+
+      {!isAddingCompany && !isEditingCompany && (
         <>
           <div className="flex justify-between items-center mb-4">
             <div className="relative w-full max-w-xs">
@@ -64,6 +82,7 @@ const Companies = () => {
           <CompanyList
             companies={filteredCompanies}
             isLoading={isLoading}
+            onEditCompany={(company: Company) => { setSelectedCompany(company); setIsEditingCompany(true); }}
           />
         </>
       )}

@@ -5,6 +5,9 @@ import { CreditCard } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { useState } from "react";
+import { DateRange } from "react-day-picker";
 
 type PayrollGroupStatus = {
   name: string;
@@ -26,6 +29,8 @@ type PayrollStatusProps = {
 
 const PayrollStatus = ({ isLoading, payrollData }: PayrollStatusProps) => {
   const { toast } = useToast();
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const handleGeneratePayslips = async () => {
     try {
@@ -82,6 +87,9 @@ const PayrollStatus = ({ isLoading, payrollData }: PayrollStatusProps) => {
         </span>
       </CardHeader>
       <CardContent className="px-4 py-5 sm:p-6">
+        <div className="mb-4">
+          <DateRangePicker value={dateRange ?? { from: undefined, to: undefined }} onChange={setDateRange} />
+        </div>
         {isLoading ? (
           <>
             <div className="mb-5">

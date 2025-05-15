@@ -280,7 +280,7 @@ export function SortableTable<T>({
                   {columns.map((column, colIndex) => (
                     <TableCell key={colIndex}>
                       {column.cell ? (
-                        column.cell(row)
+                        <>{column.cell(row)}</>
                       ) : (
                         <span className="truncate">
                           {truncateText(String((row as any)[column.key] || ""), 50)}

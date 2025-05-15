@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 interface DownloadButtonProps extends ButtonProps {
   filename: string;
-  data?: string | (() => Promise<string>);
+  data?: string | Blob | (() => Promise<string | Blob>);
   loading?: boolean;
   contentType?: string;
   onDownloadStart?: () => void;
@@ -35,11 +35,31 @@ export function DownloadButton({
       setIsDownloading(true);
       if (onDownloadStart) onDownloadStart();
 
-      let content = typeof data === "function" ? await data() : data;
-      
-      // Create a blob with the data
-      const blob = new Blob([content], { type: contentType });
-      
+      let content: string | Blob;
+      if (typeof data === "function") {
+        content = await data();
+      } else {
+        content = data;
+      }
+
+      let blob: Blob;
+      if (content instanceof Blob) {
+        blob = content;
+      } else if (typeof content === "string" && content.startsWith("data:application/pdf")) {
+        // If it's a data URI, convert to Blob
+        const byteString = atob(content.split(',')[1]);
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        blob = new Blob([ab], { type: "application/pdf" });
+      } else if (typeof content === "string") {
+        blob = new Blob([content], { type: contentType });
+      } else {
+        throw new Error("Unsupported download data type");
+      }
+
       // Create an object URL for the blob
       const url = URL.createObjectURL(blob);
       

@@ -6,15 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { DateRange } from "react-day-picker";
 
 type PayrollFormProps = {
   onSubmit: () => void;
   onCancel: () => void;
-  payrollPeriod: {
-    from: Date;
-    to: Date;
-  };
-  setPayrollPeriod: (period: { from: Date; to: Date }) => void;
+  payrollPeriod: DateRange;
+  setPayrollPeriod: (period: DateRange) => void;
 };
 
 const PayrollForm = ({ onSubmit, onCancel, payrollPeriod, setPayrollPeriod }: PayrollFormProps) => {
@@ -43,43 +42,8 @@ const PayrollForm = ({ onSubmit, onCancel, payrollPeriod, setPayrollPeriod }: Pa
           <h3 className="text-lg font-medium mb-4">Payroll Period</h3>
           <div className="flex flex-col space-y-4">
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Start Date</label>
-              <div className="relative">
-                <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
-                  <span className="flex items-center">
-                    <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
-                    {format(payrollPeriod.from, "PPP")}
-                  </span>
-                </div>
-                <div className="absolute top-full mt-1 z-10">
-                  <Calendar
-                    mode="single"
-                    selected={payrollPeriod.from}
-                    onSelect={(date) => date && setPayrollPeriod({ ...payrollPeriod, from: date })}
-                    initialFocus
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">End Date</label>
-              <div className="relative">
-                <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
-                  <span className="flex items-center">
-                    <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
-                    {format(payrollPeriod.to, "PPP")}
-                  </span>
-                </div>
-                <div className="absolute top-full mt-1 z-10">
-                  <Calendar
-                    mode="single"
-                    selected={payrollPeriod.to}
-                    onSelect={(date) => date && setPayrollPeriod({ ...payrollPeriod, to: date })}
-                    initialFocus
-                  />
-                </div>
-              </div>
+              <label className="block text-sm font-medium text-gray-700">Payroll Period</label>
+              <DateRangePicker value={payrollPeriod} onChange={setPayrollPeriod} />
             </div>
           </div>
           
@@ -149,11 +113,11 @@ const PayrollForm = ({ onSubmit, onCancel, payrollPeriod, setPayrollPeriod }: Pa
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Companies</SelectItem>
-                  {companies?.map((company) => (
+                  {Array.isArray(companies) ? companies.map((company: any) => (
                     <SelectItem key={company.id} value={company.id.toString()}>
                       {company.name}
                     </SelectItem>
-                  ))}
+                  )) : null}
                 </SelectContent>
               </Select>
             </div>

@@ -5,9 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Clock, FileText, Receipt, Calendar, Bell, Briefcase } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import DTRForm from "@/components/dtr/DTRForm";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState } from "react";
+import DTRCapture from "@/components/dtr/DTRCapture";
+import { useToast } from "@/hooks/use-toast";
 
 const EmployeeDashboard = () => {
   const { user } = useAuth();
+  const [showClockDialog, setShowClockDialog] = useState(false);
+  const [showDTRDialog, setShowDTRDialog] = useState(false);
+  const { toast } = useToast();
   
   // Fetch employee DTRs
   const { data: dtrs, isLoading: isDtrsLoading } = useQuery({
@@ -21,16 +29,28 @@ const EmployeeDashboard = () => {
     enabled: !!user,
   });
 
+  // Fetch full employee profile for the logged-in user
+  const { data: employeeProfile } = useQuery({
+    queryKey: ["/api/employees", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const res = await fetch(`/api/employees/${user.id}`);
+      if (!res.ok) return null;
+      return await res.json();
+    },
+    enabled: !!user?.id,
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold tracking-tight">Welcome, {user?.firstName}!</h1>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex items-center gap-1">
+          <Button variant="outline" size="sm" className="flex items-center gap-1" onClick={() => setShowClockDialog(true)}>
             <Clock className="w-4 h-4" />
             Clock In/Out
           </Button>
-          <Button size="sm" className="flex items-center gap-1">
+          <Button size="sm" className="flex items-center gap-1" onClick={() => setShowDTRDialog(true)}>
             <FileText className="w-4 h-4" />
             Submit DTR
           </Button>
@@ -165,6 +185,40 @@ const EmployeeDashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Clock In/Out Dialog */}
+      <Dialog open={showClockDialog} onOpenChange={setShowClockDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Clock In / Out</DialogTitle>
+          </DialogHeader>
+          <DTRForm
+            onSubmit={() => setShowClockDialog(false)}
+            onCancel={() => setShowClockDialog(false)}
+            employees={employeeProfile ? [employeeProfile] : []}
+            isLoading={false}
+          />
+        </DialogContent>
+      </Dialog>
+      {/* Submit DTR Dialog */}
+      <Dialog open={showDTRDialog} onOpenChange={setShowDTRDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Submit DTR (via OCR)</DialogTitle>
+          </DialogHeader>
+          <DTRCapture
+            onSuccess={() => {
+              setShowDTRDialog(false);
+              toast({ title: "DTR Submitted", description: "Your DTR has been processed and submitted." });
+            }}
+            onError={(error) => {
+              setShowDTRDialog(false);
+              toast({ title: "DTR Submission Error", description: error, variant: "destructive" });
+            }}
+            onCancel={() => setShowDTRDialog(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

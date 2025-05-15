@@ -25,12 +25,14 @@ import { apiRequest } from "@/lib/queryClient";
 
 const COLORS = ['#1976D2', '#4CAF50', '#FF9800', '#F44336', '#9C27B0', '#3F51B5'];
 
+// Helper to check if value is a plain object
+function isPlainObject(val: unknown): val is Record<string, any> {
+  return val !== null && typeof val === 'object' && !Array.isArray(val);
+}
+
 const Reports = () => {
   const [reportType, setReportType] = useState("payroll");
-  const [dateRange, setDateRange] = useState<{
-    from: Date;
-    to: Date;
-  }>({
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({
     from: subDays(new Date(), 30),
     to: new Date(),
   });
@@ -45,7 +47,13 @@ const Reports = () => {
 
   // Fetch report data based on filters
   const { data: reportData, isLoading } = useQuery({
-    queryKey: ['/api/reports', reportType, dateRange.from.toISOString(), dateRange.to.toISOString(), companyFilter],
+    queryKey: [
+      '/api/reports',
+      reportType,
+      dateRange.from ? dateRange.from.toISOString() : null,
+      dateRange.to ? dateRange.to.toISOString() : null,
+      companyFilter,
+    ],
   });
 
   const handleExportReport = async () => {
@@ -53,8 +61,8 @@ const Reports = () => {
       await apiRequest("POST", "/api/reports/export", {
         reportType,
         dateRange: {
-          from: format(dateRange.from, "yyyy-MM-dd"),
-          to: format(dateRange.to, "yyyy-MM-dd"),
+          ...(dateRange.from ? { from: format(dateRange.from, "yyyy-MM-dd") } : {}),
+          ...(dateRange.to ? { to: format(dateRange.to, "yyyy-MM-dd") } : {}),
         },
         companyFilter,
       });
@@ -73,7 +81,8 @@ const Reports = () => {
   };
 
   const renderPayrollReport = () => {
-    const payrollData = reportData?.payroll || [];
+    const payrollData = isPlainObject(reportData) && Array.isArray(reportData.payroll) ? reportData.payroll : [];
+    const summary = isPlainObject(reportData) && isPlainObject(reportData.summary) ? reportData.summary : {};
     
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -85,13 +94,13 @@ const Reports = () => {
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={payrollData}
+                  data={Array.isArray(payrollData) ? payrollData : []}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="period" />
                   <YAxis />
-                  <Tooltip formatter={(value) => `₱${value.toFixed(2)}`} />
+                  <Tooltip formatter={(value) => typeof value === 'number' ? `₱${value.toFixed(2)}` : value} />
                   <Legend />
                   <Bar dataKey="regularPay" name="Regular Pay" fill="#1976D2" />
                   <Bar dataKey="overtimePay" name="Overtime Pay" fill="#4CAF50" />
@@ -113,7 +122,7 @@ const Reports = () => {
                   <h5 className="text-sm font-medium text-gray-900">Total Payroll</h5>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  ₱{reportData?.summary?.totalPayroll?.toFixed(2) || '0.00'}
+                  ₱{typeof summary.totalPayroll === 'number' ? summary.totalPayroll.toFixed(2) : '0.00'}
                 </div>
               </div>
 
@@ -122,7 +131,7 @@ const Reports = () => {
                   <h5 className="text-sm font-medium text-gray-900">Average Pay per Employee</h5>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  ₱{reportData?.summary?.averagePayPerEmployee?.toFixed(2) || '0.00'}
+                  ₱{typeof summary.averagePayPerEmployee === 'number' ? summary.averagePayPerEmployee.toFixed(2) : '0.00'}
                 </div>
               </div>
 
@@ -131,7 +140,7 @@ const Reports = () => {
                   <h5 className="text-sm font-medium text-gray-900">Total Employees Paid</h5>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {reportData?.summary?.totalEmployeesPaid || '0'}
+                  {summary.totalEmployeesPaid ?? '0'}
                 </div>
               </div>
             </div>
@@ -142,7 +151,8 @@ const Reports = () => {
   };
 
   const renderEmployeeReport = () => {
-    const employeeData = reportData?.employee || [];
+    const employeeData = isPlainObject(reportData) && isPlainObject(reportData.employee) ? reportData.employee : { byDepartment: [] };
+    const summary = isPlainObject(reportData) && isPlainObject(reportData.summary) ? reportData.summary : {};
     
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -155,7 +165,7 @@ const Reports = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={employeeData.byDepartment}
+                    data={Array.isArray(employeeData.byDepartment) ? employeeData.byDepartment : []}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -165,7 +175,7 @@ const Reports = () => {
                     nameKey="name"
                     label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                   >
-                    {employeeData.byDepartment?.map((entry, index) => (
+                    {(Array.isArray(employeeData.byDepartment) ? employeeData.byDepartment : []).map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -187,7 +197,7 @@ const Reports = () => {
                   <h5 className="text-sm font-medium text-gray-900">Total Employees</h5>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {reportData?.summary?.totalEmployees || '0'}
+                  {summary.totalEmployees ?? '0'}
                 </div>
               </div>
 
@@ -196,10 +206,10 @@ const Reports = () => {
                   <h5 className="text-sm font-medium text-gray-900">Active Employees</h5>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {reportData?.summary?.activeEmployees || '0'}
+                  {summary.activeEmployees ?? '0'}
                 </div>
                 <div className="text-sm text-gray-500">
-                  ({reportData?.summary?.activePercentage || '0'}% of total)
+                  ({summary.activePercentage ?? '0'}% of total)
                 </div>
               </div>
 
@@ -210,15 +220,15 @@ const Reports = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Regular</span>
-                    <span className="text-sm font-medium">{reportData?.summary?.regularEmployees || '0'}</span>
+                    <span className="text-sm font-medium">{summary.regularEmployees ?? '0'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Contract</span>
-                    <span className="text-sm font-medium">{reportData?.summary?.contractEmployees || '0'}</span>
+                    <span className="text-sm font-medium">{summary.contractEmployees ?? '0'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Project-based</span>
-                    <span className="text-sm font-medium">{reportData?.summary?.projectEmployees || '0'}</span>
+                    <span className="text-sm font-medium">{summary.projectEmployees ?? '0'}</span>
                   </div>
                 </div>
               </div>
@@ -230,7 +240,8 @@ const Reports = () => {
   };
 
   const renderDTRReport = () => {
-    const dtrData = reportData?.dtr || [];
+    const dtrData = isPlainObject(reportData) && isPlainObject(reportData.dtr) ? reportData.dtr : { byDate: [] };
+    const summary = isPlainObject(reportData) && isPlainObject(reportData.summary) ? reportData.summary : {};
     
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -242,7 +253,7 @@ const Reports = () => {
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={dtrData.byDate}
+                  data={Array.isArray(dtrData.byDate) ? dtrData.byDate : []}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
@@ -270,7 +281,7 @@ const Reports = () => {
                   <h5 className="text-sm font-medium text-gray-900">Total DTR Submissions</h5>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {reportData?.summary?.totalSubmissions || '0'}
+                  {summary.totalSubmissions ?? '0'}
                 </div>
               </div>
 
@@ -281,19 +292,19 @@ const Reports = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Pending</span>
-                    <span className="text-sm font-medium">{reportData?.summary?.pendingDTRs || '0'}</span>
+                    <span className="text-sm font-medium">{summary.pendingDTRs ?? '0'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Approved</span>
-                    <span className="text-sm font-medium">{reportData?.summary?.approvedDTRs || '0'}</span>
+                    <span className="text-sm font-medium">{summary.approvedDTRs ?? '0'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Rejected</span>
-                    <span className="text-sm font-medium">{reportData?.summary?.rejectedDTRs || '0'}</span>
+                    <span className="text-sm font-medium">{summary.rejectedDTRs ?? '0'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Processing</span>
-                    <span className="text-sm font-medium">{reportData?.summary?.processingDTRs || '0'}</span>
+                    <span className="text-sm font-medium">{summary.processingDTRs ?? '0'}</span>
                   </div>
                 </div>
               </div>
@@ -303,10 +314,10 @@ const Reports = () => {
                   <h5 className="text-sm font-medium text-gray-900">Average Hours</h5>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {reportData?.summary?.averageHoursPerDTR?.toFixed(2) || '0'} hrs
+                  {typeof summary.averageHoursPerDTR === 'number' ? summary.averageHoursPerDTR.toFixed(2) : '0'} hrs
                 </div>
                 <div className="text-sm text-gray-500">
-                  Including {reportData?.summary?.averageOvertimeHours?.toFixed(2) || '0'} overtime hours
+                  Including {typeof summary.averageOvertimeHours === 'number' ? summary.averageOvertimeHours.toFixed(2) : '0'} overtime hours
                 </div>
               </div>
             </div>
@@ -359,10 +370,18 @@ const Reports = () => {
             <Filter className="h-4 w-4 text-gray-500" />
             <span className="text-sm text-gray-500">Date Range:</span>
             <DateRangePicker
-              value={dateRange}
+              value={{ from: dateRange.from ?? undefined, to: dateRange.to ?? undefined } as { from: Date | undefined; to: Date | undefined }}
               onChange={setDateRange}
               className="w-auto"
             />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDateRange({ from: undefined, to: undefined })}
+              title="Clear date filter"
+            >
+              Clear
+            </Button>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -373,7 +392,7 @@ const Reports = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Companies</SelectItem>
-                {companies?.map((company) => (
+                {Array.isArray(companies) && companies.map((company: any) => (
                   <SelectItem key={company.id} value={company.id.toString()}>
                     {company.name}
                   </SelectItem>

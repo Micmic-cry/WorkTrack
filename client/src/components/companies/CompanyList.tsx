@@ -13,14 +13,17 @@ import { Pencil, MoreVertical, Users, FileText, XCircle } from "lucide-react";
 import { Company } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useNavigate } from "react-router-dom";
 
 type CompanyListProps = {
   companies?: Company[];
   isLoading: boolean;
+  onEditCompany?: (company: Company) => void;
 };
 
-const CompanyList = ({ companies = [], isLoading }: CompanyListProps) => {
+const CompanyList = ({ companies = [], isLoading, onEditCompany }: CompanyListProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleDeactivate = async (companyId: number) => {
     try {
@@ -54,6 +57,14 @@ const CompanyList = ({ companies = [], isLoading }: CompanyListProps) => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleViewEmployees = (company: Company) => {
+    navigate(`/employees?companyId=${company.id}`);
+  };
+
+  const handleViewPayroll = (company: Company) => {
+    navigate(`/payroll?companyId=${company.id}`);
   };
 
   return (
@@ -157,15 +168,15 @@ const CompanyList = ({ companies = [], isLoading }: CompanyListProps) => {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onEditCompany && onEditCompany(company)}>
                           <Pencil className="mr-2 h-4 w-4" />
                           Edit Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewEmployees(company)}>
                           <Users className="mr-2 h-4 w-4" />
                           View Employees
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewPayroll(company)}>
                           <FileText className="mr-2 h-4 w-4" />
                           View Payroll
                         </DropdownMenuItem>

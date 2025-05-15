@@ -539,17 +539,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             dtrId: dtr.id,
             payPeriodStart: dtr.date,
             payPeriodEnd: dtr.date,
-            regularHours: regularHours,
-            overtimeHours: overtimeHours,
-            regularPay: regularPay,
-            overtimePay: overtimePay,
+            totalRegularHours: regularHours,
+            totalOvertimeHours: overtimeHours,
             grossPay: grossPay,
-            taxDeductions: taxDeduction,
-            otherDeductions: otherDeductions,
+            totalDeductions: totalDeductions,
             netPay: netPay,
             status: "Processed",
-            paymentMethod: "Direct Deposit",
-            paymentDate: format(new Date(), "yyyy-MM-dd"),
+            processedBy: 1,
+            processedDate: format(new Date(), "yyyy-MM-dd"),
           };
           
           const payroll = await storage.createPayroll(payrollData);
@@ -1128,91 +1125,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reports
   app.get("/api/reports", async (req, res) => {
     try {
-      const { reportType, from, to } = req.query;
+      const { from, to } = req.query;
       const employees = await storage.getAllEmployees();
       const dtrs = await storage.getAllDTRs();
       const payrolls = await storage.getAllPayrolls();
-      
-      let reportData = {
-        summary: {}
+
+      // Payroll report data
+      const payrollReport = [
+        { period: "Week 1", regularPay: 120000, overtimePay: 15000, deductions: 13500 },
+        { period: "Week 2", regularPay: 125000, overtimePay: 12000, deductions: 13700 },
+        { period: "Week 3", regularPay: 118000, overtimePay: 14500, deductions: 13250 },
+        { period: "Week 4", regularPay: 122000, overtimePay: 13000, deductions: 13500 }
+      ];
+      const payrollSummary = {
+        totalPayroll: payrolls.reduce((sum, p) => sum + p.grossPay, 0),
+        averagePayPerEmployee: employees.length > 0 ? payrolls.reduce((sum, p) => sum + p.netPay, 0) / employees.length : 0,
+        totalEmployeesPaid: new Set(payrolls.map(p => p.employeeId)).size
       };
-      
-      if (reportType === "payroll") {
-        reportData.payroll = [
-          { period: "Week 1", regularPay: 120000, overtimePay: 15000, deductions: 13500 },
-          { period: "Week 2", regularPay: 125000, overtimePay: 12000, deductions: 13700 },
-          { period: "Week 3", regularPay: 118000, overtimePay: 14500, deductions: 13250 },
-          { period: "Week 4", regularPay: 122000, overtimePay: 13000, deductions: 13500 }
-        ];
-        
-        reportData.summary = {
-          totalPayroll: payrolls.reduce((sum, p) => sum + p.grossPay, 0),
-          averagePayPerEmployee: employees.length > 0 ? 
-            payrolls.reduce((sum, p) => sum + p.netPay, 0) / employees.length : 0,
-          totalEmployeesPaid: new Set(payrolls.map(p => p.employeeId)).size
-        };
-      } else if (reportType === "employee") {
-        // Department distribution
-        const deptCounts = {};
-        employees.forEach(e => {
-          deptCounts[e.department] = (deptCounts[e.department] || 0) + 1;
-        });
-        
-        const byDepartment = Object.keys(deptCounts).map(dept => ({
-          name: dept,
-          value: deptCounts[dept]
-        }));
-        
-        reportData.employee = {
-          byDepartment
-        };
-        
-        reportData.summary = {
-          totalEmployees: employees.length,
-          activeEmployees: employees.filter(e => e.status === "Active").length,
-          activePercentage: employees.length > 0 ? 
-            Math.round((employees.filter(e => e.status === "Active").length / employees.length) * 100) : 0,
-          regularEmployees: employees.filter(e => e.employeeType === "Regular").length,
-          contractEmployees: employees.filter(e => e.employeeType === "Contract").length,
-          projectEmployees: employees.filter(e => e.employeeType === "Project-based").length
-        };
-      } else if (reportType === "dtr") {
-        // DTR submissions by date
-        const submissionDates = {};
-        dtrs.forEach(d => {
-          const date = d.date;
-          if (!submissionDates[date]) {
-            submissionDates[date] = { date, submissions: 0, approved: 0, rejected: 0 };
-          }
-          submissionDates[date].submissions += 1;
-          
-          if (d.status === "Approved") {
-            submissionDates[date].approved += 1;
-          } else if (d.status === "Rejected") {
-            submissionDates[date].rejected += 1;
-          }
-        });
-        
-        const byDate = Object.values(submissionDates);
-        
-        reportData.dtr = {
-          byDate
-        };
-        
-        reportData.summary = {
-          totalSubmissions: dtrs.length,
-          pendingDTRs: dtrs.filter(d => d.status === "Pending").length,
-          approvedDTRs: dtrs.filter(d => d.status === "Approved").length,
-          rejectedDTRs: dtrs.filter(d => d.status === "Rejected").length,
-          processingDTRs: dtrs.filter(d => d.status === "Processing").length,
-          averageHoursPerDTR: dtrs.length > 0 ? 
-            dtrs.reduce((sum, d) => sum + d.regularHours, 0) / dtrs.length : 0,
-          averageOvertimeHours: dtrs.length > 0 ? 
-            dtrs.reduce((sum, d) => sum + (d.overtimeHours || 0), 0) / dtrs.length : 0
-        };
-      }
-      
-      res.json(reportData);
+
+      // Employee report data
+      const deptCounts: { [key: string]: number } = {};
+      employees.forEach(e => {
+        deptCounts[e.department] = (deptCounts[e.department] || 0) + 1;
+      });
+      const byDepartment = Object.keys(deptCounts).map(dept => ({ name: dept, value: deptCounts[dept] }));
+      const employeeReport = { byDepartment };
+      const employeeSummary = {
+        totalEmployees: employees.length,
+        activeEmployees: employees.filter(e => e.status === "Active").length,
+        activePercentage: employees.length > 0 ? Math.round((employees.filter(e => e.status === "Active").length / employees.length) * 100) : 0,
+        regularEmployees: employees.filter(e => e.employeeType === "Regular").length,
+        contractEmployees: employees.filter(e => e.employeeType === "Contract").length,
+        projectEmployees: employees.filter(e => e.employeeType === "Project-based").length
+      };
+
+      // DTR report data
+      const submissionDates: { [key: string]: { date: string; submissions: number; approved: number; rejected: number } } = {};
+      dtrs.forEach(d => {
+        const date = d.date;
+        if (!submissionDates[date]) {
+          submissionDates[date] = { date, submissions: 0, approved: 0, rejected: 0 };
+        }
+        submissionDates[date].submissions += 1;
+        if (d.status === "Approved") {
+          submissionDates[date].approved += 1;
+        } else if (d.status === "Rejected") {
+          submissionDates[date].rejected += 1;
+        }
+      });
+      const byDate = Object.values(submissionDates);
+      const dtrReport = { byDate };
+      const dtrSummary = {
+        totalSubmissions: dtrs.length,
+        pendingDTRs: dtrs.filter(d => d.status === "Pending").length,
+        approvedDTRs: dtrs.filter(d => d.status === "Approved").length,
+        rejectedDTRs: dtrs.filter(d => d.status === "Rejected").length,
+        processingDTRs: dtrs.filter(d => d.status === "Processing").length,
+        averageHoursPerDTR: dtrs.length > 0 ? dtrs.reduce((sum, d) => sum + d.regularHours, 0) / dtrs.length : 0,
+        averageOvertimeHours: dtrs.length > 0 ? dtrs.reduce((sum, d) => sum + (d.overtimeHours || 0), 0) / dtrs.length : 0
+      };
+
+      // Merge all summaries
+      const summary = { ...payrollSummary, ...employeeSummary, ...dtrSummary };
+
+      res.json({
+        payroll: payrollReport,
+        employee: employeeReport,
+        dtr: dtrReport,
+        summary
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to generate report" });
     }

@@ -20,8 +20,45 @@ import Settings from "@/pages/Settings";
 import AuthPage from "@/pages/auth-page";
 import Onboarding from "@/pages/Onboarding";
 import Profile from "@/pages/Profile";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
+
+// Add ProfileRoute component
+function ProfileRoute() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <div className="flex justify-center items-center h-48"><span className="loading loading-spinner loading-lg text-primary"></span></div>;
+  if (!user) return <Redirect to="/auth" />;
+  if (user.role === "Admin") {
+    return (
+      <AdminLayout>
+        <Profile />
+      </AdminLayout>
+    );
+  }
+  return (
+    <EmployeeLayout>
+      <Profile />
+    </EmployeeLayout>
+  );
+}
+
+function SettingsRoute() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <div className="flex justify-center items-center h-48"><span className="loading loading-spinner loading-lg text-primary"></span></div>;
+  if (!user) return <Redirect to="/auth" />;
+  if (user.role === "Admin") {
+    return (
+      <AdminLayout>
+        <Settings />
+      </AdminLayout>
+    );
+  }
+  return (
+    <EmployeeLayout>
+      <Settings />
+    </EmployeeLayout>
+  );
+}
 
 function Router() {
   return (
@@ -121,19 +158,11 @@ function Router() {
       />
       <ProtectedRoute 
         path="/profile" 
-        component={() => (
-          <EmployeeLayout>
-            <Profile />
-          </EmployeeLayout>
-        )} 
+        component={ProfileRoute}
       />
       <ProtectedRoute 
         path="/settings" 
-        component={() => (
-          <EmployeeLayout>
-            <Settings />
-          </EmployeeLayout>
-        )} 
+        component={SettingsRoute}
       />
       
       {/* Legacy routes for compatibility - redirect based on role */}

@@ -13,23 +13,25 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Payroll } from "@shared/schema";
+import { DateRange } from "react-day-picker";
+import { useSearchParams } from "react-router-dom";
 
 const PayrollPage = () => {
   const [isGeneratingPayroll, setIsGeneratingPayroll] = useState(false);
   const [viewingPayslip, setViewingPayslip] = useState<Payroll | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
-  const [payrollPeriod, setPayrollPeriod] = useState<{
-    from: Date;
-    to: Date;
-  }>({
+  const [payrollPeriod, setPayrollPeriod] = useState<DateRange>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
   });
 
+  const [searchParams] = useSearchParams();
+  const companyId = searchParams.get("companyId");
+
   const { toast } = useToast();
 
-  const { data: payrolls, isLoading } = useQuery({
+  const { data: payrolls, isLoading, refetch } = useQuery({
     queryKey: ['/api/payrolls'],
   });
 
@@ -37,37 +39,50 @@ const PayrollPage = () => {
     queryKey: ['/api/employees'],
   });
 
-  const filteredPayrolls = payrolls?.filter((payroll) => {
-    // Convert payroll dates to Date objects for comparison
-    const payPeriodStart = new Date(payroll.payPeriodStart);
-    const payPeriodEnd = new Date(payroll.payPeriodEnd);
+  console.log('companyId from URL:', companyId);
+  console.log('All employees:', employees);
+  const employeesInCompany = (Array.isArray(employees) ? employees : []).filter((e: any) => !companyId || String(e.companyId) === String(companyId));
+  console.log('Employees in selected company:', employeesInCompany);
+  console.log('All payrolls:', payrolls);
 
+  const filteredPayrolls = (Array.isArray(payrolls) ? payrolls : []).filter((payroll: any) => {
+    // Only filter by date if both from and to are set
+    if (payrollPeriod.from && payrollPeriod.to) {
+      const payPeriodStart = new Date(payroll.payPeriodStart);
+      const payPeriodEnd = new Date(payroll.payPeriodEnd);
+      const matchesDateRange =
+        (payPeriodStart >= payrollPeriod.from && payPeriodStart <= payrollPeriod.to) ||
+        (payPeriodEnd >= payrollPeriod.from && payPeriodEnd <= payrollPeriod.to);
+      if (!matchesDateRange) return false;
+    }
     // Filter by search query (employee name would be implemented in a real app)
     const matchesQuery =
       searchQuery === "" || payroll.employeeId.toString().includes(searchQuery);
-
     // Filter by tab
     const matchesTab =
       activeTab === "all" ||
       (activeTab === "pending" && payroll.status === "Pending") ||
       (activeTab === "processed" && payroll.status === "Processed") ||
       (activeTab === "paid" && payroll.status === "Paid");
-
-    // Filter by date range
-    const matchesDateRange =
-      (payPeriodStart >= payrollPeriod.from && payPeriodStart <= payrollPeriod.to) ||
-      (payPeriodEnd >= payrollPeriod.from && payPeriodEnd <= payrollPeriod.to);
-
-    return matchesQuery && matchesTab && matchesDateRange;
+    // Filter by companyId if present
+    if (companyId) {
+      const employee = (Array.isArray(employees) ? employees : []).find((e: any) => e.id === payroll.employeeId);
+      if (!employee || String(employee.companyId) !== String(companyId)) return false;
+    }
+    return matchesQuery && matchesTab;
   });
+
+  console.log('Filtered payrolls:', filteredPayrolls);
 
   const handleGeneratePayrolls = async () => {
     try {
+      const periodStart = payrollPeriod.from ? format(payrollPeriod.from, "yyyy-MM-dd") : "";
+      const periodEnd = payrollPeriod.to ? format(payrollPeriod.to, "yyyy-MM-dd") : "";
       await apiRequest("POST", "/api/payrolls/generate", {
-        periodStart: format(payrollPeriod.from, "yyyy-MM-dd"),
-        periodEnd: format(payrollPeriod.to, "yyyy-MM-dd"),
+        periodStart,
+        periodEnd,
       });
-      await queryClient.invalidateQueries({ queryKey: ['/api/payrolls'] });
+      await refetch(); // Force fresh fetch of payrolls
       toast({
         title: "Payrolls Generated",
         description: "Payrolls have been generated successfully.",
@@ -83,9 +98,16 @@ const PayrollPage = () => {
   };
 
   const handleDownloadPayslip = (payrollId: number) => {
-    const payroll = payrolls?.find(p => p.id === payrollId);
+    const payroll = (Array.isArray(payrolls) ? payrolls : []).find((p: any) => p.id === payrollId) as any;
     if (payroll) {
-      setViewingPayslip(payroll);
+      const employee = (Array.isArray(employees) ? employees : []).find((e: any) => e.id === payroll.employeeId);
+      setViewingPayslip({
+        ...payroll,
+        employeeName: employee ? `${employee.firstName} ${employee.lastName}` : "Not specified",
+        position: employee?.position || "Not specified",
+        department: employee?.department || "Not specified",
+        payDate: payroll.processedDate || payroll.payPeriodEnd,
+      });
     }
   };
 
@@ -124,7 +146,7 @@ const PayrollPage = () => {
   };
 
   const getEmployeeName = (employeeId: number) => {
-    const employee = employees?.find(e => e.id === employeeId);
+    const employee = (Array.isArray(employees) ? employees : []).find((e: any) => e.id === employeeId);
     return employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${employeeId}`;
   };
 
@@ -168,8 +190,8 @@ const PayrollPage = () => {
           Back to Payroll List
         </Button>
         <PayslipView
-          payroll={viewingPayslip}
-          employeeName={getEmployeeName(viewingPayslip.employeeId)}
+          payslip={viewingPayslip as any}
+          onClose={() => setViewingPayslip(null)}
         />
       </div>
     );
@@ -229,11 +251,15 @@ const PayrollPage = () => {
               <div className="flex items-center space-x-2">
                 <Filter className="h-4 w-4 text-gray-500" />
                 <span className="text-sm text-gray-500">Period:</span>
-                <DateRangePicker
-                  value={payrollPeriod}
-                  onChange={setPayrollPeriod}
-                  className="w-auto"
-                />
+                <DateRangePicker value={payrollPeriod} onChange={setPayrollPeriod} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPayrollPeriod({ from: undefined, to: undefined })}
+                  title="Clear date filter"
+                >
+                  Clear
+                </Button>
               </div>
               
               <Tabs value={activeTab} onValueChange={setActiveTab}>

@@ -9,12 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, Clock, FileUp, FileCheck, AlertCircle, Search, Filter } from "lucide-react";
 import { DTR } from "@shared/schema";
+import DTRCapture from "@/components/dtr/DTRCapture";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const EmployeeDTR = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("current");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [showDTRDialog, setShowDTRDialog] = useState(false);
+  const { toast } = useToast();
   
   // Fetch employee DTRs
   const { data: dtrs, isLoading } = useQuery<DTR[]>({
@@ -80,7 +85,7 @@ const EmployeeDTR = () => {
             <Clock className="w-4 h-4" />
             Clock In/Out
           </Button>
-          <Button size="sm" className="flex items-center gap-1">
+          <Button size="sm" className="flex items-center gap-1" onClick={() => setShowDTRDialog(true)}>
             <FileUp className="w-4 h-4" />
             Submit DTR
           </Button>
@@ -132,7 +137,7 @@ const EmployeeDTR = () => {
                   <Calendar className="h-10 w-10 text-gray-400 mx-auto mb-2" />
                   <h3 className="text-lg font-medium">No DTRs for Current Month</h3>
                   <p className="text-gray-500 mb-4">There are no time records for the current month.</p>
-                  <Button variant="outline" size="sm">Submit DTR</Button>
+                  <Button variant="outline" size="sm" onClick={() => setShowDTRDialog(true)}>Submit DTR</Button>
                 </div>
               ) : (
                 <div className="rounded-md border">
@@ -290,6 +295,26 @@ const EmployeeDTR = () => {
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* DTR OCR Dialog */}
+      <Dialog open={showDTRDialog} onOpenChange={setShowDTRDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Submit DTR (via OCR)</DialogTitle>
+          </DialogHeader>
+          <DTRCapture
+            onSuccess={() => {
+              setShowDTRDialog(false);
+              toast({ title: "DTR Submitted", description: "Your DTR has been processed and submitted." });
+            }}
+            onError={(error) => {
+              setShowDTRDialog(false);
+              toast({ title: "DTR Submission Error", description: error, variant: "destructive" });
+            }}
+            onCancel={() => setShowDTRDialog(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

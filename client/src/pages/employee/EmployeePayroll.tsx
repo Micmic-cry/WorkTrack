@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Download, Search, Filter, DollarSign, Clock, Printer } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import jsPDF from "jspdf";
+import { PDFDownloadButton } from "@/components/ui/download-button";
 
 type PayslipType = {
   id: number;
@@ -29,6 +31,7 @@ const EmployeePayroll = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [yearFilter, setYearFilter] = useState("2023");
+  const [activeTab, setActiveTab] = useState("all");
   
   // Fetch employee payslips
   const { data: payslips, isLoading } = useQuery({
@@ -77,15 +80,84 @@ const EmployeePayroll = () => {
     }).format(amount);
   };
 
+  // Generate a single PDF for all payslips
+  const generateAllPayslipsPDF = async () => {
+    const doc = new jsPDF();
+    mockPayslips.forEach((payslip, idx) => {
+      if (idx > 0) doc.addPage();
+      doc.setFontSize(16);
+      doc.text(`Payslip for Pay Period: ${payslip.periodStart} - ${payslip.periodEnd}`, 10, 20);
+      doc.setFontSize(12);
+      doc.text(`Pay Date: ${payslip.payDate}`, 10, 30);
+      doc.text(`Gross Pay: ${formatCurrency(payslip.basicPay + payslip.overtimePay)}`, 10, 40);
+      doc.text(`Overtime Pay: ${formatCurrency(payslip.overtimePay)}`, 10, 50);
+      doc.text(`Deductions:`, 10, 60);
+      let y = 70;
+      Object.entries(payslip.deductions).forEach(([key, value]) => {
+        doc.text(`${key.toUpperCase()}: ${formatCurrency(value)}`, 20, y);
+        y += 8;
+      });
+      doc.text(`Net Pay: ${formatCurrency(payslip.netPay)}`, 10, y + 8);
+    });
+    return doc.output("blob");
+  };
+
+  // Generate a tax summary PDF
+  const generateTaxSummaryPDF = async () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("Tax Summary", 10, 20);
+    doc.setFontSize(12);
+    let y = 30;
+    let totalTax = 0, totalSSS = 0, totalPhilhealth = 0, totalPagibig = 0, totalOthers = 0;
+    mockPayslips.forEach((payslip) => {
+      totalTax += payslip.deductions.tax;
+      totalSSS += payslip.deductions.sss;
+      totalPhilhealth += payslip.deductions.philhealth;
+      totalPagibig += payslip.deductions.pagibig;
+      totalOthers += payslip.deductions.others;
+    });
+    doc.text(`Total Tax: ${formatCurrency(totalTax)}`, 10, y);
+    doc.text(`Total SSS: ${formatCurrency(totalSSS)}`, 10, y + 10);
+    doc.text(`Total PhilHealth: ${formatCurrency(totalPhilhealth)}`, 10, y + 20);
+    doc.text(`Total Pag-IBIG: ${formatCurrency(totalPagibig)}`, 10, y + 30);
+    doc.text(`Total Other Deductions: ${formatCurrency(totalOthers)}`, 10, y + 40);
+    doc.text(`Total Deductions: ${formatCurrency(totalTax + totalSSS + totalPhilhealth + totalPagibig + totalOthers)}`, 10, y + 55);
+    return doc.output("blob");
+  };
+
+  // Generate a single payslip PDF
+  const generatePayslipPDF = async (payslip: PayslipType) => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(`Payslip for Pay Period: ${payslip.periodStart} - ${payslip.periodEnd}`, 10, 20);
+    doc.setFontSize(12);
+    doc.text(`Pay Date: ${payslip.payDate}`, 10, 30);
+    doc.text(`Gross Pay: ${formatCurrency(payslip.basicPay + payslip.overtimePay)}`, 10, 40);
+    doc.text(`Overtime Pay: ${formatCurrency(payslip.overtimePay)}`, 10, 50);
+    doc.text(`Deductions:`, 10, 60);
+    let y = 70;
+    Object.entries(payslip.deductions).forEach(([key, value]) => {
+      doc.text(`${key.toUpperCase()}: ${formatCurrency(value)}`, 20, y);
+      y += 8;
+    });
+    doc.text(`Net Pay: ${formatCurrency(payslip.netPay)}`, 10, y + 8);
+    return doc.output("blob");
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold tracking-tight">My Payslips</h1>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">My Payslips</h1>
+        </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex items-center gap-1">
-            <Download className="w-4 h-4" />
+          <PDFDownloadButton
+            filename="all-payslips.pdf"
+            data={generateAllPayslipsPDF}
+          >
             Download All
-          </Button>
+          </PDFDownloadButton>
         </div>
       </div>
 
@@ -148,12 +220,13 @@ const EmployeePayroll = () => {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-            <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="2023" defaultChecked>2023</TabsTrigger>
-              <TabsTrigger value="2022">2022</TabsTrigger>
-            </TabsList>
-            
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="2023">2023</TabsTrigger>
+                <TabsTrigger value="2022">2022</TabsTrigger>
+              </TabsList>
+            </Tabs>
             <div className="flex gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:flex-none">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
@@ -174,21 +247,19 @@ const EmployeePayroll = () => {
               <p className="text-gray-500">There are no payslips for the selected period.</p>
             </div>
           ) : (
-            <div className="rounded-md border">
-              <div className="grid grid-cols-12 gap-4 p-4 font-medium text-sm text-gray-500 border-b">
+            <div className="rounded-md border overflow-x-auto">
+              <div className="grid grid-cols-12 gap-4 p-4 font-medium text-sm text-gray-500 border-b min-w-[900px]">
                 <div className="col-span-4">Pay Period</div>
                 <div className="col-span-2">Pay Date</div>
                 <div className="col-span-2">Gross Pay</div>
                 <div className="col-span-2">Deductions</div>
                 <div className="col-span-2">Net Pay</div>
               </div>
-              
               {mockPayslips.map((payslip) => {
-                const totalDeductions = Object.values(payslip.deductions).reduce((sum, val) => sum + val, 0);
+                const totalDeductions = (Object.values(payslip.deductions) as number[]).reduce((sum, val) => sum + val, 0);
                 const grossPay = payslip.basicPay + payslip.overtimePay;
-                
                 return (
-                  <div key={payslip.id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50">
+                  <div key={payslip.id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50 min-w-[900px]">
                     <div className="col-span-4 flex items-center">
                       <Calendar className="h-4 w-4 mr-2 text-gray-500" />
                       <div>
@@ -217,9 +288,12 @@ const EmployeePayroll = () => {
                         <p className="font-medium text-green-600">{formatCurrency(payslip.netPay)}</p>
                         <p className="text-xs text-gray-500">Final Amount</p>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <PDFDownloadButton
+                        filename={`payslip-${payslip.periodStart}-${payslip.periodEnd}.pdf`}
+                        data={() => generatePayslipPDF(payslip)}
+                      >
                         <Download className="h-4 w-4" />
-                      </Button>
+                      </PDFDownloadButton>
                     </div>
                   </div>
                 );
@@ -228,10 +302,14 @@ const EmployeePayroll = () => {
           )}
           
           <div className="flex justify-center mt-4">
-            <Button variant="outline" className="flex items-center gap-2">
+            <PDFDownloadButton
+              filename="tax-summary.pdf"
+              data={generateTaxSummaryPDF}
+              className="flex items-center gap-2"
+            >
               <Printer className="h-4 w-4" />
               Print Tax Summary
-            </Button>
+            </PDFDownloadButton>
           </div>
         </CardContent>
       </Card>

@@ -92,28 +92,21 @@ const ActionButton: React.FC<ActionButtonProps> = ({ action }) => {
   }
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={onClick}
-            disabled={isDisabled || isLoading}
-          >
-            {isLoading ? (
-              <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-            ) : (
-              icon
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{label || type}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip content={label || type}>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        onClick={onClick}
+        disabled={isDisabled || isLoading}
+      >
+        {isLoading ? (
+          <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+        ) : (
+          icon
+        )}
+      </Button>
+    </Tooltip>
   );
 };
 
@@ -140,17 +133,12 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       {moreActions.length > 0 && (
         <DropdownMenu>
           <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>More actions</p>
-              </TooltipContent>
+            <Tooltip content="More actions">
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
             </Tooltip>
           </TooltipProvider>
           <DropdownMenuContent align="end">

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useSearchParams } from "react-router-dom";
 
 // Define the Employee type
 interface Employee {
@@ -46,6 +47,8 @@ const employeeSchema = z.object({
   status: z.enum(["Active", "Inactive", "On Leave"]),
   dateHired: z.string(),
   salary: z.number().min(0, { message: "Salary must be a positive number" }),
+  employeeType: z.enum(["Regular", "Contract", "Project-based"]),
+  dailyWage: z.number().min(0, { message: "Daily wage must be a positive number" }),
 });
 
 type EmployeeFormValues = z.infer<typeof employeeSchema>;
@@ -62,6 +65,9 @@ export default function Employees() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [companyFilter, setCompanyFilter] = useState("");
+  const [searchParams] = useSearchParams();
+  const initialCompanyId = searchParams.get("companyId");
 
   // Fetch employees
   const { data: employees = [], isLoading } = useQuery({
@@ -80,6 +86,20 @@ export default function Employees() {
       return await res.json();
     },
   });
+
+  // After fetching employees and companies:
+  const employeesWithCompanyName = employees.map((emp: any) => ({
+    ...emp,
+    companyName: companies.find((c: any) => c.id === emp.companyId)?.name || "",
+  }));
+
+  // Set company filter from URL on mount or when companies load
+  useEffect(() => {
+    if (initialCompanyId && companies.length > 0) {
+      const company = companies.find((c: any) => String(c.id) === String(initialCompanyId));
+      if (company) setCompanyFilter(company.name);
+    }
+  }, [initialCompanyId, companies]);
 
   // Add employee mutation
   const addEmployeeMutation = useMutation({
@@ -168,6 +188,8 @@ export default function Employees() {
       status: "Active",
       dateHired: new Date().toISOString().split("T")[0],
       salary: 0,
+      employeeType: "Regular",
+      dailyWage: 0,
     },
   });
 
@@ -184,6 +206,8 @@ export default function Employees() {
       status: "Active",
       dateHired: new Date().toISOString().split("T")[0],
       salary: 0,
+      employeeType: "Regular",
+      dailyWage: 0,
     });
     setIsAddDialogOpen(true);
   };
@@ -202,6 +226,8 @@ export default function Employees() {
       status: employee.status,
       dateHired: employee.dateHired,
       salary: employee.salary,
+      employeeType: "Regular",
+      dailyWage: 0,
     });
     setIsEditDialogOpen(true);
   };
@@ -281,13 +307,13 @@ export default function Employees() {
       header: "Status",
       isSortable: true,
       cell: (row) => {
-        let badgeVariant = "default";
-        if (row.status === "Active") badgeVariant = "success";
+        let badgeVariant: "default" | "destructive" | "secondary" | "outline" = "default";
+        if (row.status === "Active") badgeVariant = "default";
         if (row.status === "Inactive") badgeVariant = "secondary";
-        if (row.status === "On Leave") badgeVariant = "warning";
+        if (row.status === "On Leave") badgeVariant = "outline";
 
         return (
-          <Badge variant={badgeVariant as any} className="capitalize">
+          <Badge variant={badgeVariant} className="capitalize">
             {row.status}
           </Badge>
         );
@@ -303,39 +329,47 @@ export default function Employees() {
       key: "actions",
       header: "Actions",
       cell: (row) => (
-        <ActionBar
-          actions={[
-            {
-              type: "view",
-              label: "View",
-              onClick: () => handleViewClick(row),
-            },
-            {
-              type: "edit",
-              label: "Edit",
-              onClick: () => handleEditClick(row),
-            },
-            {
-              type: "delete",
-              label: "Delete",
-              onClick: () => handleDeleteClick(row),
-            },
-            {
-              type: "email",
-              label: "Send Email",
-              onClick: () => {
-                toast({
-                  title: "Feature Coming Soon",
-                  description: "Email functionality will be available soon.",
-                  variant: "default",
-                });
+        <div>
+          <ActionBar
+            actions={[
+              {
+                type: "view",
+                label: "View",
+                onClick: () => handleViewClick(row),
               },
-            },
-          ]}
-        />
+              {
+                type: "edit",
+                label: "Edit",
+                onClick: () => handleEditClick(row),
+              },
+              {
+                type: "delete",
+                label: "Delete",
+                onClick: () => handleDeleteClick(row),
+              },
+              {
+                type: "email",
+                label: "Send Email",
+                onClick: () => {
+                  toast({
+                    title: "Feature Coming Soon",
+                    description: "Email functionality will be available soon.",
+                    variant: "default",
+                  });
+                },
+              },
+            ]}
+          />
+        </div>
       ),
     },
   ];
+
+  // Filter employees by company name
+  const filteredEmployees = employeesWithCompanyName.filter((emp: any) =>
+    companyFilter === "" ||
+    (emp.companyName && emp.companyName.toLowerCase().includes(companyFilter.toLowerCase()))
+  );
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -350,12 +384,20 @@ export default function Employees() {
           <Plus className="h-4 w-4" /> Add Employee
         </Button>
       </div>
-
+      <div className="mb-4 max-w-xs">
+        <input
+          type="text"
+          placeholder="Filter company"
+          value={companyFilter}
+          onChange={e => setCompanyFilter(e.target.value)}
+          className="border rounded px-2 py-1 w-full"
+        />
+      </div>
       <Card>
         <CardContent className="pt-6">
           <SortableTable
             columns={columns}
-            data={employees}
+            data={filteredEmployees}
             isLoading={isLoading}
             defaultSortKey="lastName"
             defaultSortDirection="asc"
@@ -458,6 +500,53 @@ export default function Employees() {
                   )}
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="employeeType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Employee Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Regular">Regular</SelectItem>
+                          <SelectItem value="Contract">Contract</SelectItem>
+                          <SelectItem value="Project-based">Project-based</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dailyWage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Daily Wage (₱)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="text"
+                          placeholder="Daily Wage"
+                          min={0}
+                          step={0.01}
+                          {...field}
+                          onChange={e => {
+                            const value = e.target.value.replace(/[^\d.]/g, '');
+                            field.onChange(Number(value));
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
                 name="companyId"
@@ -533,10 +622,13 @@ export default function Employees() {
                     <FormLabel>Salary</FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
+                        type="text"
                         placeholder="Salary amount"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        onChange={e => {
+                          const value = e.target.value.replace(/[^\d.]/g, '');
+                          field.onChange(Number(value));
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -658,6 +750,53 @@ export default function Employees() {
                   )}
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="employeeType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Employee Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Regular">Regular</SelectItem>
+                          <SelectItem value="Contract">Contract</SelectItem>
+                          <SelectItem value="Project-based">Project-based</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dailyWage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Daily Wage (₱)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="text"
+                          placeholder="Daily Wage"
+                          min={0}
+                          step={0.01}
+                          {...field}
+                          onChange={e => {
+                            const value = e.target.value.replace(/[^\d.]/g, '');
+                            field.onChange(Number(value));
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
                 name="companyId"
@@ -733,10 +872,13 @@ export default function Employees() {
                     <FormLabel>Salary</FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
+                        type="text"
                         placeholder="Salary amount"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        onChange={e => {
+                          const value = e.target.value.replace(/[^\d.]/g, '');
+                          field.onChange(Number(value));
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -835,13 +977,18 @@ export default function Employees() {
                 )}
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Company:</span>
-                  <span>{selectedEmployee.companyName}</span>
+                  <span>{
+                    companies.find((c: any) => c.id === selectedEmployee.companyId)?.name || 'Not specified'
+                  }</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Status:</span>
                   <Badge variant={
-                    selectedEmployee.status === "Active" ? "success" : 
-                    selectedEmployee.status === "Inactive" ? "secondary" : "warning"
+                    selectedEmployee.status === "Active"
+                      ? "default"
+                      : selectedEmployee.status === "Inactive"
+                      ? "secondary"
+                      : "outline"
                   } className="capitalize">
                     {selectedEmployee.status}
                   </Badge>
