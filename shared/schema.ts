@@ -14,7 +14,7 @@ export const employees = pgTable("employees", {
   employeeType: text("employee_type").notNull(), // Regular, Contract, Project-based
   dateHired: text("date_hired").notNull(),
   status: text("status").notNull(), // Active, Inactive
-  hourlyRate: doublePrecision("hourly_rate").notNull(),
+  salary: doublePrecision("salary").notNull(),
   companyId: integer("company_id").notNull(),
 });
 

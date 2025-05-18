@@ -510,20 +510,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: "Processing"
           });
           
-          // Find the employee to get the hourly rate
+          // Find the employee to get the salary
           const employee = await storage.getEmployee(dtr.employeeId);
           if (!employee) {
             errors.push({ id: dtrId, message: "Employee not found" });
             continue;
           }
           
-          const hourlyRate = employee.hourlyRate;
+          const salary = employee.salary;
           const regularHours = dtr.regularHours;
           const overtimeHours = dtr.overtimeHours || 0;
           
           // Calculate pay
-          const regularPay = regularHours * hourlyRate;
-          const overtimePay = overtimeHours * hourlyRate * 1.5; // Assuming 1.5x for overtime
+          const regularPay = regularHours * salary;
+          const overtimePay = overtimeHours * salary * 1.5; // Assuming 1.5x for overtime
           const grossPay = regularPay + overtimePay;
           
           // Apply standard deductions (simplified for demo)
@@ -756,19 +756,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "Processing"
       });
       
-      // Find the employee to get the hourly rate
+      // Find the employee to get the salary
       const employee = await storage.getEmployee(dtr.employeeId);
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
       
-      const hourlyRate = employee.hourlyRate;
+      const salary = employee.salary;
       const regularHours = dtr.regularHours;
       const overtimeHours = dtr.overtimeHours || 0;
       
       // Calculate pay
-      const regularPay = regularHours * hourlyRate;
-      const overtimePay = overtimeHours * hourlyRate * 1.25; // OT is 1.25x
+      const regularPay = regularHours * salary;
+      const overtimePay = overtimeHours * salary * 1.25; // OT is 1.25x
       const grossPay = regularPay + overtimePay;
       
       // Apply simple deductions (10% of gross pay for demo)
@@ -829,8 +829,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalOvertimeHours += dtr.overtimeHours || 0;
           });
           
-          const regularPay = totalRegularHours * employee.hourlyRate;
-          const overtimePay = totalOvertimeHours * employee.hourlyRate * 1.25;
+          const regularPay = totalRegularHours * employee.salary;
+          const overtimePay = totalOvertimeHours * employee.salary * 1.25;
           const grossPay = regularPay + overtimePay;
           const totalDeductions = grossPay * 0.1; // 10% deduction for demo
           const netPay = grossPay - totalDeductions;

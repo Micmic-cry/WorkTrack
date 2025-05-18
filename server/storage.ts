@@ -236,7 +236,7 @@ export class MemStorage implements IStorage {
         employeeType,
         dateHired: `2023-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
         status: Math.random() > 0.2 ? "Active" : "Inactive", // 80% active
-        hourlyRate: Math.floor(200 + Math.random() * 300),
+        salary: Math.floor(20000 + Math.random() * 30000),
         companyId,
       });
     }
@@ -292,7 +292,7 @@ export class MemStorage implements IStorage {
       const totalRegularHours = 80 + Math.floor(Math.random() * 20); // 80-100 hours
       const totalOvertimeHours = Math.random() > 0.5 ? Math.floor(Math.random() * 10) : 0; // 50% chance of overtime
       
-      const grossPay = (totalRegularHours * employee.hourlyRate) + (totalOvertimeHours * employee.hourlyRate * 1.25);
+      const grossPay = employee.salary;
       const totalDeductions = grossPay * 0.1; // 10% deductions
       const netPay = grossPay - totalDeductions;
       
