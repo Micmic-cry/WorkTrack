@@ -4,7 +4,14 @@ const dtrSchema = new mongoose.Schema({
   employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
   date: { type: String, required: true },
   type: { type: String, required: true },
-  status: { type: String, enum: ['Present', 'Absent', 'Late', 'On Leave'], required: true },
+  status: { 
+    type: String, 
+    enum: [
+      'Present', 'Absent', 'Late', 'On Leave',
+      'Pending', 'Approved', 'Rejected', 'Processing'
+    ], 
+    required: true 
+  },
   timeIn: { type: String, required: true },
   timeOut: { type: String, required: true },
   breakHours: { type: Number, default: 0 },
