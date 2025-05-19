@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,7 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      employeeId: 0,
+      employeeId: "",
       date: today,
       timeIn: "08:00",
       timeOut: "17:00",
@@ -87,12 +87,10 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
   const regularHours = calculateHours();
 
   const handleEmployeeChange = (employeeId: string) => {
-    const id = parseInt(employeeId);
-    const employee = employees.find(e => e.id === id);
+    const employee = employees.find(e => e._id === employeeId);
     if (employee) {
       setSelectedEmployeeType(employee.employeeType);
-      
-      // If employee type is Project-based, set DTR type to Project-based
+      // Only set DTR type if Project-based
       if (employee.employeeType === "Project-based") {
         form.setValue("type", "Project-based");
       }
@@ -104,7 +102,7 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
       const dtrData = {
         ...values,
         submissionDate: format(new Date(), "yyyy-MM-dd"),
-        employeeId: parseInt(values.employeeId.toString()),
+        employeeId: values.employeeId,
         regularHours: regularHours
       };
       
@@ -133,6 +131,14 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
     }
   };
 
+  useEffect(() => {
+    // If there are employees and no employeeId is selected, set the first one as default
+    if (employees.length > 0 && !form.getValues("employeeId")) {
+      form.setValue("employeeId", employees[0]._id);
+      handleEmployeeChange(employees[0]._id);
+    }
+  }, [employees]);
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -144,11 +150,8 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
               <FormItem>
                 <FormLabel>Employee</FormLabel>
                 <Select
-                  onValueChange={(value) => {
-                    field.onChange(parseInt(value));
-                    handleEmployeeChange(value);
-                  }}
-                  defaultValue={field.value.toString()}
+                  onValueChange={field.onChange}
+                  value={field.value}
                 >
                   <FormControl>
                     <SelectTrigger>
@@ -157,15 +160,15 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
                   </FormControl>
                   <SelectContent>
                     {isLoading ? (
-                      <SelectItem value="loading">Loading employees...</SelectItem>
+                      <SelectItem key="loading" value="loading">Loading employees...</SelectItem>
                     ) : employees.length > 0 ? (
                       employees.map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id.toString()}>
+                        <SelectItem key={employee._id} value={employee._id}>
                           {employee.firstName} {employee.lastName}
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="none">No employees available</SelectItem>
+                      <SelectItem key="none" value="none">No employees available</SelectItem>
                     )}
                   </SelectContent>
                 </Select>

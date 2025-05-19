@@ -28,22 +28,22 @@ interface Employee {
   phone?: string;
   position: string;
   department?: string;
-  companyId: number;
+  companyId: number; // always number in data
   companyName?: string;
   status: "Active" | "Inactive" | "On Leave";
   dateHired: string;
   salary: number;
 }
 
-// Create a schema for employee form
-const employeeSchema = z.object({
+// Create a schema for employee form (companyId as string)
+const employeeFormSchema = z.object({
   firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
   lastName: z.string().min(2, { message: "Last name must be at least 2 characters" }),
   email: z.string().email({ message: "Invalid email address" }),
   phone: z.string().optional(),
   position: z.string().min(2, { message: "Position is required" }),
   department: z.string().optional(),
-  companyId: z.number().min(1, { message: "Company is required" }),
+  companyId: z.string().min(1, { message: "Company is required" }),
   status: z.enum(["Active", "Inactive", "On Leave"]),
   dateHired: z.string(),
   salary: z.number().min(0, { message: "Salary must be a positive number" }),
@@ -51,7 +51,7 @@ const employeeSchema = z.object({
   dailyWage: z.number().min(0, { message: "Daily wage must be a positive number" }),
 });
 
-type EmployeeFormValues = z.infer<typeof employeeSchema>;
+type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
 
 interface Company {
   id: number;
@@ -90,7 +90,7 @@ export default function Employees() {
   // After fetching employees and companies:
   const employeesWithCompanyName = employees.map((emp: any) => ({
     ...emp,
-    companyName: companies.find((c: any) => c.id === emp.companyId)?.name || "",
+    companyName: companies.find((c: any) => String(c.id) === String(emp.companyId))?.name || "",
   }));
 
   // Set company filter from URL on mount or when companies load
@@ -176,7 +176,7 @@ export default function Employees() {
 
   // Setup form for adding/editing employee
   const form = useForm<EmployeeFormValues>({
-    resolver: zodResolver(employeeSchema),
+    resolver: zodResolver(employeeFormSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -184,7 +184,7 @@ export default function Employees() {
       phone: "",
       position: "",
       department: "",
-      companyId: 0,
+      companyId: "",
       status: "Active",
       dateHired: new Date().toISOString().split("T")[0],
       salary: 0,
@@ -202,7 +202,7 @@ export default function Employees() {
       phone: "",
       position: "",
       department: "",
-      companyId: 0,
+      companyId: "",
       status: "Active",
       dateHired: new Date().toISOString().split("T")[0],
       salary: 0,
@@ -215,6 +215,7 @@ export default function Employees() {
   // Populate form when opening edit dialog
   const handleEditClick = (employee: Employee) => {
     setSelectedEmployee(employee);
+    const company = companies.find((c: any) => String(c.id) === String(employee.companyId));
     form.reset({
       firstName: employee.firstName,
       lastName: employee.lastName,
@@ -222,7 +223,7 @@ export default function Employees() {
       phone: employee.phone || "",
       position: employee.position,
       department: employee.department || "",
-      companyId: employee.companyId,
+      companyId: company ? company.id : "",
       status: employee.status,
       dateHired: employee.dateHired,
       salary: employee.salary,
@@ -554,8 +555,8 @@ export default function Employees() {
                   <FormItem>
                     <FormLabel>Company</FormLabel>
                     <Select
-                      onValueChange={(value) => field.onChange(parseInt(value, 10))}
-                      defaultValue={field.value.toString()}
+                      onValueChange={val => field.onChange(val)}
+                      defaultValue={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -564,7 +565,7 @@ export default function Employees() {
                       </FormControl>
                       <SelectContent>
                         {companies.map((company: Company) => (
-                          <SelectItem key={company.id} value={company.id.toString()}>
+                          <SelectItem key={company.id} value={String(company.id)}>
                             {company.name}
                           </SelectItem>
                         ))}
@@ -583,7 +584,7 @@ export default function Employees() {
                       <FormLabel>Status</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        defaultValue={String(field.value)}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -667,7 +668,6 @@ export default function Employees() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-4">
-              {/* Same form fields as Add Employee */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -804,8 +804,8 @@ export default function Employees() {
                   <FormItem>
                     <FormLabel>Company</FormLabel>
                     <Select
-                      onValueChange={(value) => field.onChange(parseInt(value, 10))}
-                      value={field.value.toString()}
+                      onValueChange={val => field.onChange(val)}
+                      defaultValue={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -814,7 +814,7 @@ export default function Employees() {
                       </FormControl>
                       <SelectContent>
                         {companies.map((company: Company) => (
-                          <SelectItem key={company.id} value={company.id.toString()}>
+                          <SelectItem key={company.id} value={String(company.id)}>
                             {company.name}
                           </SelectItem>
                         ))}
@@ -833,7 +833,7 @@ export default function Employees() {
                       <FormLabel>Status</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
+                        defaultValue={String(field.value)}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -978,7 +978,7 @@ export default function Employees() {
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Company:</span>
                   <span>{
-                    companies.find((c: any) => c.id === selectedEmployee.companyId)?.name || 'Not specified'
+                    companies.find((c: any) => String(c.id) === String(selectedEmployee.companyId))?.name || 'Not specified'
                   }</span>
                 </div>
                 <div className="flex justify-between">

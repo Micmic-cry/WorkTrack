@@ -7,12 +7,15 @@ import CompanyList from "@/components/companies/CompanyList";
 import CompanyForm from "@/components/companies/CompanyForm";
 import { Plus, Search } from "lucide-react";
 import { Company } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const Companies = () => {
   const [isAddingCompany, setIsAddingCompany] = useState(false);
   const [isEditingCompany, setIsEditingCompany] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ['/api/companies'],
@@ -24,6 +27,40 @@ const Companies = () => {
         company.contactPerson.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : [];
+
+  const handleDeactivate = async (companyId: string) => {
+    try {
+      await apiRequest("PATCH", `/api/companies/${companyId}/deactivate`, {});
+      await queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      toast({
+        title: "Company Deactivated",
+        description: "The company has been deactivated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to deactivate company. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleActivate = async (companyId: string) => {
+    try {
+      await apiRequest("PATCH", `/api/companies/${companyId}/activate`, {});
+      await queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      toast({
+        title: "Company Activated",
+        description: "The company has been activated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to activate company. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -58,7 +95,7 @@ const Companies = () => {
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">Edit Company</h3>
           <CompanyForm
-            companyId={selectedCompany.id}
+            companyId={selectedCompany._id}
             onCancel={() => { setIsEditingCompany(false); setSelectedCompany(null); }}
             onSubmit={() => { setIsEditingCompany(false); setSelectedCompany(null); }}
           />
@@ -83,6 +120,8 @@ const Companies = () => {
             companies={filteredCompanies}
             isLoading={isLoading}
             onEditCompany={(company: Company) => { setSelectedCompany(company); setIsEditingCompany(true); }}
+            onDeactivate={handleDeactivate}
+            onActivate={handleActivate}
           />
         </>
       )}

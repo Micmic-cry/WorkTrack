@@ -1,175 +1,108 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Employee table
-export const employees = pgTable("employees", {
-  id: serial("id").primaryKey(),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
-  email: text("email").notNull().unique(),
-  phone: text("phone").notNull(),
-  position: text("position").notNull(),
-  department: text("department").notNull(),
-  employeeType: text("employee_type").notNull(), // Regular, Contract, Project-based
-  dateHired: text("date_hired").notNull(),
-  status: text("status").notNull(), // Active, Inactive
-  salary: doublePrecision("salary").notNull(),
-  companyId: integer("company_id").notNull(),
+// Company Schema
+export const companySchema = z.object({
+  _id: z.string(),
+  name: z.string(),
+  address: z.string(),
+  contactPerson: z.string(),
+  contactEmail: z.string(),
+  contactPhone: z.string(),
+  status: z.enum(["Active", "Inactive"]),
 });
 
-export const insertEmployeeSchema = createInsertSchema(employees).omit({
-  id: true,
+export const insertCompanySchema = companySchema.omit({ _id: true });
+
+// Employee Schema
+export const employeeSchema = z.object({
+  _id: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  email: z.string().email(),
+  phone: z.string(),
+  position: z.string(),
+  department: z.string(),
+  employeeType: z.enum(["Regular", "Contract", "Project-based"]),
+  dateHired: z.string(),
+  status: z.enum(["Active", "Inactive"]),
+  salary: z.number(),
+  companyId: z.string(),
 });
 
-// Company table
-export const companies = pgTable("companies", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(),
-  address: text("address").notNull(),
-  contactPerson: text("contact_person").notNull(),
-  contactEmail: text("contact_email").notNull(),
-  contactPhone: text("contact_phone").notNull(),
-  status: text("status").notNull(), // Active, Inactive
+export const insertEmployeeSchema = employeeSchema.omit({ _id: true });
+
+// DTR Schema
+export const dtrSchema = z.object({
+  _id: z.string(),
+  employeeId: z.string(),
+  date: z.string(),
+  timeIn: z.string(),
+  timeOut: z.string(),
+  breakHours: z.number().default(1),
+  regularHours: z.number(),
+  overtimeHours: z.number().default(0),
+  remarks: z.string().optional(),
+  type: z.enum(["Daily", "Bi-Weekly", "Project-based"]),
+  status: z.enum(["Pending", "Approved", "Rejected", "Processing"]),
+  submissionDate: z.string(),
+  approvedBy: z.string().optional(),
+  approvalDate: z.string().optional(),
 });
 
-export const insertCompanySchema = createInsertSchema(companies).omit({
-  id: true,
-});
-
-// DTR table (Daily Time Record)
-export const dtrs = pgTable("dtrs", {
-  id: serial("id").primaryKey(),
-  employeeId: integer("employee_id").notNull(),
-  date: text("date").notNull(),
-  timeIn: text("time_in").notNull(),
-  timeOut: text("time_out").notNull(),
-  breakHours: doublePrecision("break_hours").notNull().default(1),
-  regularHours: doublePrecision("regular_hours").notNull(),
-  overtimeHours: doublePrecision("overtime_hours").notNull().default(0),
-  remarks: text("remarks"),
-  type: text("type").notNull(), // Daily, Bi-Weekly, Project-based
-  status: text("status").notNull(), // Pending, Approved, Rejected, Processing
-  submissionDate: text("submission_date").notNull(),
-  approvedBy: integer("approved_by"),
-  approvalDate: text("approval_date"),
-});
-
-export const insertDtrSchema = createInsertSchema(dtrs).omit({
-  id: true,
+export const insertDtrSchema = dtrSchema.omit({
+  _id: true,
   approvalDate: true,
   approvedBy: true,
   regularHours: true,
 });
 
-// Payroll table
-export const payrolls = pgTable("payrolls", {
-  id: serial("id").primaryKey(),
-  employeeId: integer("employee_id").notNull(),
-  payPeriodStart: text("pay_period_start").notNull(),
-  payPeriodEnd: text("pay_period_end").notNull(),
-  totalRegularHours: doublePrecision("total_regular_hours").notNull(),
-  totalOvertimeHours: doublePrecision("total_overtime_hours").notNull(),
-  grossPay: doublePrecision("gross_pay").notNull(),
-  totalDeductions: doublePrecision("total_deductions").notNull(),
-  netPay: doublePrecision("net_pay").notNull(),
-  status: text("status").notNull(), // Pending, Processed, Paid
-  processedBy: integer("processed_by"),
-  processedDate: text("processed_date"),
+// Payroll Schema
+export const payrollSchema = z.object({
+  _id: z.string(),
+  employeeId: z.string(),
+  payPeriodStart: z.string(),
+  payPeriodEnd: z.string(),
+  totalRegularHours: z.number(),
+  totalOvertimeHours: z.number(),
+  grossPay: z.number(),
+  totalDeductions: z.number(),
+  netPay: z.number(),
+  status: z.enum(["Pending", "Processed", "Paid"]),
+  processedBy: z.string().optional(),
+  processedDate: z.string().optional(),
 });
 
-export const insertPayrollSchema = createInsertSchema(payrolls).omit({
-  id: true,
+export const insertPayrollSchema = payrollSchema.omit({
+  _id: true,
   processedDate: true,
 });
 
-// User table (for system users)
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
-  email: text("email").notNull().unique(),
-  role: text("role").notNull(), // Admin, Manager, Staff
-  status: text("status").notNull(), // Active, Inactive
-});
-
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-});
-
-// DTR Format table (for storing OCR recognition patterns)
-export const dtrFormats = pgTable("dtr_formats", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  companyId: integer("company_id").references(() => companies.id),
-  pattern: text("pattern").notNull(),
-  extractionRules: json("extraction_rules").notNull(),
-  example: text("example"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertDtrFormatSchema = createInsertSchema(dtrFormats).omit({
-  id: true,
-  isActive: true,
-  createdAt: true,
-});
-
-// Unknown DTR Format table (for learning new formats)
-export const unknownDtrFormats = pgTable("unknown_dtr_formats", {
-  id: serial("id").primaryKey(),
-  rawText: text("raw_text").notNull(),
-  parsedData: json("parsed_data"),
-  imageData: text("image_data"),
-  companyId: integer("company_id").references(() => companies.id),
-  isProcessed: boolean("is_processed").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertUnknownDtrFormatSchema = createInsertSchema(unknownDtrFormats).omit({
-  id: true,
-  isProcessed: true,
-  createdAt: true,
-});
-
-// Activity table (for system logs)
-export const activities = pgTable("activities", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  action: text("action").notNull(),
-  description: text("description").notNull(),
-  timestamp: text("timestamp").notNull(),
-  isRead: boolean("is_read").default(false),
-});
-
-export const insertActivitySchema = createInsertSchema(activities).omit({
-  id: true,
-  isRead: true,
-});
-
 // Define the types
-export type Employee = typeof employees.$inferSelect;
-export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
-
-export type Company = typeof companies.$inferSelect;
+export type Company = z.infer<typeof companySchema>;
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 
-export type DTR = typeof dtrs.$inferSelect;
+export type Employee = z.infer<typeof employeeSchema>;
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
+
+export type DTR = z.infer<typeof dtrSchema>;
 export type InsertDTR = z.infer<typeof insertDtrSchema>;
 
-export type DtrFormat = typeof dtrFormats.$inferSelect;
-export type InsertDtrFormat = z.infer<typeof insertDtrFormatSchema>;
-
-export type UnknownDtrFormat = typeof unknownDtrFormats.$inferSelect;
-export type InsertUnknownDtrFormat = z.infer<typeof insertUnknownDtrFormatSchema>;
-
-export type Payroll = typeof payrolls.$inferSelect;
+export type Payroll = z.infer<typeof payrollSchema>;
 export type InsertPayroll = z.infer<typeof insertPayrollSchema>;
 
-export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
+// User Schema
+export const userSchema = z.object({
+  _id: z.string(),
+  username: z.string(),
+  password: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  email: z.string().email(),
+  role: z.enum(["Admin", "Manager", "Staff"]),
+  status: z.enum(["Active", "Inactive"]),
+});
 
-export type Activity = typeof activities.$inferSelect;
-export type InsertActivity = z.infer<typeof insertActivitySchema>;
+export const insertUserSchema = userSchema.omit({ _id: true });
+
+export type User = z.infer<typeof userSchema>;
+export type InsertUser = z.infer<typeof insertUserSchema>;

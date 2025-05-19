@@ -13,43 +13,58 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { insertCompanySchema } from "@shared/schema";
+import { insertCompanySchema, Company } from "@shared/schema";
+import { useEffect } from "react";
 
 type CompanyFormProps = {
   onSubmit: () => void;
   onCancel: () => void;
-  companyId?: number;
+  companyId?: string;
 };
 
 const CompanyForm = ({ onSubmit, onCancel, companyId }: CompanyFormProps) => {
   const { toast } = useToast();
   const isEditing = !!companyId;
 
-  // If editing, fetch company data
-  const company = isEditing
-    ? { id: companyId, name: "", address: "", contactPerson: "", contactEmail: "", contactPhone: "", status: "Active" }
-    : null;
-
   const form = useForm({
     resolver: zodResolver(insertCompanySchema),
-    defaultValues: isEditing && company
-      ? {
-          name: company.name,
-          address: company.address,
-          contactPerson: company.contactPerson,
-          contactEmail: company.contactEmail,
-          contactPhone: company.contactPhone,
-          status: company.status,
-        }
-      : {
-          name: "",
-          address: "",
-          contactPerson: "",
-          contactEmail: "",
-          contactPhone: "",
-          status: "Active",
-        },
+    defaultValues: {
+      name: "",
+      address: "",
+      contactPerson: "",
+      contactEmail: "",
+      contactPhone: "",
+      status: "Active",
+    },
   });
+
+  // Fetch company data if editing
+  useEffect(() => {
+    const fetchCompany = async () => {
+      if (isEditing && companyId) {
+        try {
+          const response = await apiRequest("GET", `/api/companies/${companyId}`);
+          const company = await response.json() as Company;
+          form.reset({
+            name: company.name,
+            address: company.address,
+            contactPerson: company.contactPerson,
+            contactEmail: company.contactEmail,
+            contactPhone: company.contactPhone,
+            status: company.status,
+          });
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to fetch company details. Please try again.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    fetchCompany();
+  }, [isEditing, companyId, form, toast]);
 
   const handleSubmit = async (values: any) => {
     try {

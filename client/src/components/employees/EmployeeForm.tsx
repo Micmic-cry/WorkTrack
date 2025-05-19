@@ -72,7 +72,7 @@ const EmployeeForm = ({ onSubmit, onCancel, employeeId }: EmployeeFormProps) => 
           dateHired: new Date().toISOString().split('T')[0],
           status: "Active",
           hourlyRate: 0,
-          companyId: 0,
+          companyId: "",
         },
   });
 
@@ -291,8 +291,8 @@ const EmployeeForm = ({ onSubmit, onCancel, employeeId }: EmployeeFormProps) => 
               <FormItem>
                 <FormLabel>Company</FormLabel>
                 <Select
-                  onValueChange={(value) => field.onChange(parseInt(value))}
-                  defaultValue={field.value.toString()}
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
                 >
                   <FormControl>
                     <SelectTrigger>
@@ -304,7 +304,7 @@ const EmployeeForm = ({ onSubmit, onCancel, employeeId }: EmployeeFormProps) => 
                       <SelectItem value="loading">Loading companies...</SelectItem>
                     ) : companies && companies.length > 0 ? (
                       companies.map((company) => (
-                        <SelectItem key={company.id} value={company.id.toString()}>
+                        <SelectItem key={company.id} value={company.id}>
                           {company.name}
                         </SelectItem>
                       ))

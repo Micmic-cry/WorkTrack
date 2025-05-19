@@ -2,11 +2,9 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import session from "express-session";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
-import { storage } from "./storage";
-import { User as SelectUser } from "@shared/schema";
+import { User } from "./models/User";
 import createMemoryStore from "memorystore";
+import bcrypt from "bcryptjs";
 
 const MemoryStore = createMemoryStore(session);
 
@@ -14,28 +12,6 @@ declare global {
   namespace Express {
     interface User extends SelectUser {}
   }
-}
-
-const scryptAsync = promisify(scrypt);
-
-async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
-}
-
-async function comparePasswords(supplied: string, stored: string) {
-  // Check if password contains a salt (has a dot)
-  if (!stored || !stored.includes('.')) {
-    // For non-hashed passwords (like default ones), do a direct comparison
-    return supplied === stored;
-  }
-  
-  // For hashed passwords, do proper comparison
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
 export function setupAuth(app: Express) {
@@ -59,23 +35,33 @@ export function setupAuth(app: Express) {
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
+      console.log('Attempting login for:', username);
       try {
-        const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
+        const user = await User.findOne({ username });
+        if (!user) {
+          console.log('User not found');
           return done(null, false, { message: "Invalid username or password" });
-        } else {
-          return done(null, user);
         }
+        console.log('User found:', user.username);
+        const valid = await bcrypt.compare(password, user.password);
+        console.log('Password match:', valid);
+        if (!valid) return done(null, false, { message: "Invalid username or password" });
+        console.log("Logged in user:", user);
+        return done(null, user);
       } catch (error) {
         return done(error);
       }
-    }),
+    })
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
-  passport.deserializeUser(async (id: number, done) => {
+  passport.serializeUser((user: any, done) => {
+    done(null, user._id.toString());
+  });
+
+  passport.deserializeUser(async (id, done) => {
     try {
-      const user = await storage.getUser(id);
+      const user = await User.findById(id).lean();
+      if (!user) return done(null, false);
       done(null, user);
     } catch (error) {
       done(error);
@@ -85,20 +71,14 @@ export function setupAuth(app: Express) {
   app.post("/api/register", async (req, res, next) => {
     try {
       const { username, password, firstName, lastName, email, role = "Staff", status = "Active" } = req.body;
-      
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
+      if (await User.findOne({ username })) {
         return res.status(400).json({ error: "Username already exists" });
       }
-
-      const existingEmail = await storage.getUserByEmail(email);
-      if (existingEmail) {
+      if (await User.findOne({ email })) {
         return res.status(400).json({ error: "Email already exists" });
       }
-
-      const hashedPassword = await hashPassword(password);
-      
-      const user = await storage.createUser({
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await User.create({
         username,
         password: hashedPassword,
         firstName,
@@ -107,22 +87,10 @@ export function setupAuth(app: Express) {
         role,
         status
       });
-
-      // Create an activity log
-      await storage.createActivity({
-        userId: user.id,
-        action: "user_registered",
-        description: `User ${username} was registered`,
-        timestamp: new Date().toISOString(),
-        isRead: false
-      });
-
       req.login(user, (err) => {
         if (err) return next(err);
-        
-        // Don't send password in response
-        const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+        const { password, ...userObj } = user.toObject();
+        res.status(201).json(userObj);
       });
     } catch (error) {
       next(error);
@@ -133,43 +101,19 @@ export function setupAuth(app: Express) {
     passport.authenticate("local", (err, user, info) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ error: info?.message || "Invalid credentials" });
-      
-      req.login(user, async (err) => {
+      req.login(user, (err) => {
         if (err) return next(err);
-        
-        // Create login activity
-        await storage.createActivity({
-          userId: user.id,
-          action: "user_login",
-          description: `User ${user.username} logged in`,
-          timestamp: new Date().toISOString(),
-          isRead: false
-        });
-        
-        // Don't send password in response
-        const { password, ...userWithoutPassword } = user;
-        res.json(userWithoutPassword);
+        const userObj = user.toObject ? user.toObject() : user;
+        const { password, ...rest } = userObj;
+        res.json(rest);
       });
     })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
     if (req.user) {
-      const userId = req.user.id;
-      const username = req.user.username;
-      
       req.logout((err) => {
         if (err) return next(err);
-        
-        // Create logout activity
-        storage.createActivity({
-          userId,
-          action: "user_logout",
-          description: `User ${username} logged out`,
-          timestamp: new Date().toISOString(),
-          isRead: false
-        }).catch(console.error);
-        
         res.status(200).json({ message: "Logged out successfully" });
       });
     } else {
@@ -181,21 +125,20 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    
-    // Don't send password in response
-    const { password, ...userWithoutPassword } = req.user as SelectUser;
-    res.json(userWithoutPassword);
+    const userObj = req.user.toObject ? req.user.toObject() : req.user;
+    const { password, ...rest } = userObj;
+    res.json(rest);
   });
 
-  // Check if user has admin rights
   app.get("/api/check-admin", (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    
-    const user = req.user as SelectUser;
+    const user = req.user;
     const isAdmin = user.role === "Admin";
-    
+    if (isAdmin) {
+      setLocation("/admin");
+    }
     res.json({ isAdmin });
   });
 }

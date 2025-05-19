@@ -393,7 +393,7 @@ const Reports = () => {
               <SelectContent>
                 <SelectItem value="all">All Companies</SelectItem>
                 {Array.isArray(companies) && companies.map((company: any) => (
-                  <SelectItem key={company.id} value={company.id.toString()}>
+                  <SelectItem key={company.id} value={company.id}>
                     {company.name}
                   </SelectItem>
                 ))}

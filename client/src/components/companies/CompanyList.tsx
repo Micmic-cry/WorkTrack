@@ -19,52 +19,20 @@ type CompanyListProps = {
   companies?: Company[];
   isLoading: boolean;
   onEditCompany?: (company: Company) => void;
+  onDeactivate?: (companyId: string) => void;
+  onActivate?: (companyId: string) => void;
 };
 
-const CompanyList = ({ companies = [], isLoading, onEditCompany }: CompanyListProps) => {
+const CompanyList = ({ companies = [], isLoading, onEditCompany, onDeactivate, onActivate }: CompanyListProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleDeactivate = async (companyId: number) => {
-    try {
-      await apiRequest("PATCH", `/api/companies/${companyId}/deactivate`, {});
-      await queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
-      toast({
-        title: "Company Deactivated",
-        description: "The company has been deactivated successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to deactivate company. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleActivate = async (companyId: number) => {
-    try {
-      await apiRequest("PATCH", `/api/companies/${companyId}/activate`, {});
-      await queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
-      toast({
-        title: "Company Activated",
-        description: "The company has been activated successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to activate company. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleViewEmployees = (company: Company) => {
-    navigate(`/employees?companyId=${company.id}`);
+    navigate(`/employees?companyId=${company._id}`);
   };
 
   const handleViewPayroll = (company: Company) => {
-    navigate(`/payroll?companyId=${company.id}`);
+    navigate(`/payroll?companyId=${company._id}`);
   };
 
   return (
@@ -122,7 +90,7 @@ const CompanyList = ({ companies = [], isLoading, onEditCompany }: CompanyListPr
                 ))
             ) : companies.length > 0 ? (
               companies.map((company) => (
-                <tr key={company.id} className="hover:bg-gray-50">
+                <tr key={company._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
                       {company.name}
@@ -184,7 +152,7 @@ const CompanyList = ({ companies = [], isLoading, onEditCompany }: CompanyListPr
                         {company.status === "Active" ? (
                           <DropdownMenuItem
                             className="text-red-600"
-                            onClick={() => handleDeactivate(company.id)}
+                            onClick={() => onDeactivate && onDeactivate(company.id)}
                           >
                             <XCircle className="mr-2 h-4 w-4" />
                             Deactivate
@@ -192,7 +160,7 @@ const CompanyList = ({ companies = [], isLoading, onEditCompany }: CompanyListPr
                         ) : (
                           <DropdownMenuItem
                             className="text-green-600"
-                            onClick={() => handleActivate(company.id)}
+                            onClick={() => onActivate && onActivate(company.id)}
                           >
                             <XCircle className="mr-2 h-4 w-4" />
                             Activate

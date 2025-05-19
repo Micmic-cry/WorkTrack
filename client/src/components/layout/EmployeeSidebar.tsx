@@ -95,7 +95,9 @@ const EmployeeSidebar = ({ isOpen }: SidebarProps) => {
           <div className="flex-shrink-0">
             <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-100">
               <span className="text-sm font-medium leading-none text-blue-700">
-                {user ? `${user.firstName[0]}${user.lastName[0]}` : 'EU'}
+                {user && user.firstName?.[0] && user.lastName?.[0]
+                  ? `${user.firstName[0]}${user.lastName[0]}`
+                  : 'EU'}
               </span>
             </span>
           </div>

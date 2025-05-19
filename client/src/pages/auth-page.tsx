@@ -47,7 +47,7 @@ export default function AuthPage() {
   // Redirect to appropriate dashboard based on role if already logged in
   useEffect(() => {
     if (user) {
-      // If user is admin, redirect to admin dashboard, otherwise to employee dashboard
+      console.log("Logged in user:", user); // Debug log for user object
       if (user.role === "Admin") {
         setLocation("/admin");
       } else {

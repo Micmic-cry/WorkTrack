@@ -24,75 +24,74 @@ import {
   type UnknownDtrFormat,
   type InsertUnknownDtrFormat,
 } from "@shared/schema";
+import { MongoDBStorage } from './storage/mongodb';
 
 export interface IStorage {
   // Employee operations
-  getEmployee(id: number): Promise<Employee | undefined>;
+  getEmployee(id: string): Promise<Employee | undefined>;
   getAllEmployees(): Promise<Employee[]>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
-  updateEmployee(id: number, data: Partial<Employee>): Promise<Employee | undefined>;
-  deleteEmployee(id: number): Promise<boolean>;
+  updateEmployee(id: string, data: Partial<Employee>): Promise<Employee | undefined>;
+  deleteEmployee(id: string): Promise<boolean>;
 
   // Company operations
-  getCompany(id: number): Promise<Company | undefined>;
+  getCompany(id: string): Promise<Company | undefined>;
   getAllCompanies(): Promise<Company[]>;
   createCompany(company: InsertCompany): Promise<Company>;
-  updateCompany(id: number, data: Partial<Company>): Promise<Company | undefined>;
-  deleteCompany(id: number): Promise<boolean>;
+  updateCompany(id: string, data: Partial<Company>): Promise<Company | undefined>;
+  deleteCompany(id: string): Promise<boolean>;
 
   // DTR operations
-  getDTR(id: number): Promise<DTR | undefined>;
+  getDTR(id: string): Promise<DTR | undefined>;
   getAllDTRs(): Promise<DTR[]>;
   createDTR(dtr: InsertDTR & { regularHours: number }): Promise<DTR>;
-  updateDTR(id: number, data: Partial<DTR>): Promise<DTR | undefined>;
-  deleteDTR(id: number): Promise<boolean>;
+  updateDTR(id: string, data: Partial<DTR>): Promise<DTR | undefined>;
+  deleteDTR(id: string): Promise<boolean>;
 
   // DTR Format operations
-  getDtrFormat(id: number): Promise<DtrFormat | undefined>;
+  getDtrFormat(id: string): Promise<DtrFormat | undefined>;
   getAllDtrFormats(): Promise<DtrFormat[]>;
   createDtrFormat(format: InsertDtrFormat): Promise<DtrFormat>;
-  updateDtrFormat(id: number, data: Partial<DtrFormat>): Promise<DtrFormat | undefined>;
-  deleteDtrFormat(id: number): Promise<boolean>;
+  updateDtrFormat(id: string, data: Partial<DtrFormat>): Promise<DtrFormat | undefined>;
+  deleteDtrFormat(id: string): Promise<boolean>;
 
   // Unknown DTR Format operations
-  getUnknownDtrFormat(id: number): Promise<UnknownDtrFormat | undefined>;
+  getUnknownDtrFormat(id: string): Promise<UnknownDtrFormat | undefined>;
   getAllUnknownDtrFormats(): Promise<UnknownDtrFormat[]>;
   createUnknownDtrFormat(format: InsertUnknownDtrFormat): Promise<UnknownDtrFormat>;
-  updateUnknownDtrFormat(id: number, data: Partial<UnknownDtrFormat>): Promise<UnknownDtrFormat | undefined>;
-  deleteUnknownDtrFormat(id: number): Promise<boolean>;
+  updateUnknownDtrFormat(id: string, data: Partial<UnknownDtrFormat>): Promise<UnknownDtrFormat | undefined>;
+  deleteUnknownDtrFormat(id: string): Promise<boolean>;
 
   // Payroll operations
-  getPayroll(id: number): Promise<Payroll | undefined>;
+  getPayroll(id: string): Promise<Payroll | undefined>;
   getAllPayrolls(): Promise<Payroll[]>;
   createPayroll(payroll: InsertPayroll): Promise<Payroll>;
-  updatePayroll(id: number, data: Partial<Payroll>): Promise<Payroll | undefined>;
-  deletePayroll(id: number): Promise<boolean>;
+  updatePayroll(id: string, data: Partial<Payroll>): Promise<Payroll | undefined>;
+  deletePayroll(id: string): Promise<boolean>;
 
   // User operations
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  getUserByEmail(email: string): Promise<User | undefined>;
+  getUser(id: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
-  updateUser(id: number, data: Partial<User>): Promise<User | undefined>;
-  deleteUser(id: number): Promise<boolean>;
+  updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
+  clearUsers(): Promise<void>;
 
   // Activity operations
-  getActivity(id: number): Promise<Activity | undefined>;
+  getActivity(id: string): Promise<Activity | undefined>;
   getAllActivities(): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
   markAllActivitiesAsRead(): Promise<void>;
+  clearActivities(): Promise<void>;
 
-  // Data reset operations
+  // Clear operations
   clearEmployees(): Promise<void>;
   clearCompanies(): Promise<void>;
   clearDTRs(): Promise<void>;
+  clearPayrolls(): Promise<void>;
+  clearAll(): Promise<void>;
   clearDtrFormats(): Promise<void>;
   clearUnknownDtrFormats(): Promise<void>;
-  clearPayrolls(): Promise<void>;
-  clearUsers(): Promise<void>;
-  clearActivities(): Promise<void>;
-  clearAll(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -349,8 +348,8 @@ export class MemStorage implements IStorage {
   }
 
   // Employee operations
-  async getEmployee(id: number): Promise<Employee | undefined> {
-    return this.employees.get(id);
+  async getEmployee(id: string): Promise<Employee | undefined> {
+    return this.employees.get(parseInt(id, 10));
   }
 
   async getAllEmployees(): Promise<Employee[]> {
@@ -364,22 +363,22 @@ export class MemStorage implements IStorage {
     return newEmployee;
   }
 
-  async updateEmployee(id: number, data: Partial<Employee>): Promise<Employee | undefined> {
-    const employee = this.employees.get(id);
+  async updateEmployee(id: string, data: Partial<Employee>): Promise<Employee | undefined> {
+    const employee = this.employees.get(parseInt(id, 10));
     if (!employee) return undefined;
     
     const updatedEmployee: Employee = { ...employee, ...data };
-    this.employees.set(id, updatedEmployee);
+    this.employees.set(parseInt(id, 10), updatedEmployee);
     return updatedEmployee;
   }
 
-  async deleteEmployee(id: number): Promise<boolean> {
-    return this.employees.delete(id);
+  async deleteEmployee(id: string): Promise<boolean> {
+    return this.employees.delete(parseInt(id, 10));
   }
 
   // Company operations
-  async getCompany(id: number): Promise<Company | undefined> {
-    return this.companies.get(id);
+  async getCompany(id: string): Promise<Company | undefined> {
+    return this.companies.get(parseInt(id, 10));
   }
 
   async getAllCompanies(): Promise<Company[]> {
@@ -393,22 +392,22 @@ export class MemStorage implements IStorage {
     return newCompany;
   }
 
-  async updateCompany(id: number, data: Partial<Company>): Promise<Company | undefined> {
-    const company = this.companies.get(id);
+  async updateCompany(id: string, data: Partial<Company>): Promise<Company | undefined> {
+    const company = this.companies.get(parseInt(id, 10));
     if (!company) return undefined;
     
     const updatedCompany: Company = { ...company, ...data };
-    this.companies.set(id, updatedCompany);
+    this.companies.set(parseInt(id, 10), updatedCompany);
     return updatedCompany;
   }
 
-  async deleteCompany(id: number): Promise<boolean> {
-    return this.companies.delete(id);
+  async deleteCompany(id: string): Promise<boolean> {
+    return this.companies.delete(parseInt(id, 10));
   }
 
   // DTR operations
-  async getDTR(id: number): Promise<DTR | undefined> {
-    return this.dtrs.get(id);
+  async getDTR(id: string): Promise<DTR | undefined> {
+    return this.dtrs.get(parseInt(id, 10));
   }
 
   async getAllDTRs(): Promise<DTR[]> {
@@ -422,22 +421,22 @@ export class MemStorage implements IStorage {
     return newDTR;
   }
 
-  async updateDTR(id: number, data: Partial<DTR>): Promise<DTR | undefined> {
-    const dtr = this.dtrs.get(id);
+  async updateDTR(id: string, data: Partial<DTR>): Promise<DTR | undefined> {
+    const dtr = this.dtrs.get(parseInt(id, 10));
     if (!dtr) return undefined;
     
     const updatedDTR: DTR = { ...dtr, ...data };
-    this.dtrs.set(id, updatedDTR);
+    this.dtrs.set(parseInt(id, 10), updatedDTR);
     return updatedDTR;
   }
 
-  async deleteDTR(id: number): Promise<boolean> {
-    return this.dtrs.delete(id);
+  async deleteDTR(id: string): Promise<boolean> {
+    return this.dtrs.delete(parseInt(id, 10));
   }
 
   // Payroll operations
-  async getPayroll(id: number): Promise<Payroll | undefined> {
-    return this.payrolls.get(id);
+  async getPayroll(id: string): Promise<Payroll | undefined> {
+    return this.payrolls.get(parseInt(id, 10));
   }
 
   async getAllPayrolls(): Promise<Payroll[]> {
@@ -451,34 +450,22 @@ export class MemStorage implements IStorage {
     return newPayroll;
   }
 
-  async updatePayroll(id: number, data: Partial<Payroll>): Promise<Payroll | undefined> {
-    const payroll = this.payrolls.get(id);
+  async updatePayroll(id: string, data: Partial<Payroll>): Promise<Payroll | undefined> {
+    const payroll = this.payrolls.get(parseInt(id, 10));
     if (!payroll) return undefined;
     
     const updatedPayroll: Payroll = { ...payroll, ...data };
-    this.payrolls.set(id, updatedPayroll);
+    this.payrolls.set(parseInt(id, 10), updatedPayroll);
     return updatedPayroll;
   }
 
-  async deletePayroll(id: number): Promise<boolean> {
-    return this.payrolls.delete(id);
+  async deletePayroll(id: string): Promise<boolean> {
+    return this.payrolls.delete(parseInt(id, 10));
   }
 
   // User operations
-  async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username
-    );
-  }
-
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email === email
-    );
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(parseInt(id, 10));
   }
 
   async getAllUsers(): Promise<User[]> {
@@ -492,22 +479,22 @@ export class MemStorage implements IStorage {
     return newUser;
   }
 
-  async updateUser(id: number, data: Partial<User>): Promise<User | undefined> {
-    const user = this.users.get(id);
+  async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
+    const user = this.users.get(parseInt(id, 10));
     if (!user) return undefined;
     
     const updatedUser: User = { ...user, ...data };
-    this.users.set(id, updatedUser);
+    this.users.set(parseInt(id, 10), updatedUser);
     return updatedUser;
   }
 
-  async deleteUser(id: number): Promise<boolean> {
-    return this.users.delete(id);
+  async deleteUser(id: string): Promise<boolean> {
+    return this.users.delete(parseInt(id, 10));
   }
 
   // Activity operations
-  async getActivity(id: number): Promise<Activity | undefined> {
-    return this.activities.get(id);
+  async getActivity(id: string): Promise<Activity | undefined> {
+    return this.activities.get(parseInt(id, 10));
   }
 
   async getAllActivities(): Promise<Activity[]> {
@@ -559,8 +546,8 @@ export class MemStorage implements IStorage {
   }
 
   // DTR Format operations
-  async getDtrFormat(id: number): Promise<DtrFormat | undefined> {
-    return this.dtrFormats.get(id);
+  async getDtrFormat(id: string): Promise<DtrFormat | undefined> {
+    return this.dtrFormats.get(parseInt(id, 10));
   }
 
   async getAllDtrFormats(): Promise<DtrFormat[]> {
@@ -580,22 +567,22 @@ export class MemStorage implements IStorage {
     return newFormat;
   }
 
-  async updateDtrFormat(id: number, data: Partial<DtrFormat>): Promise<DtrFormat | undefined> {
-    const format = this.dtrFormats.get(id);
+  async updateDtrFormat(id: string, data: Partial<DtrFormat>): Promise<DtrFormat | undefined> {
+    const format = this.dtrFormats.get(parseInt(id, 10));
     if (!format) return undefined;
     
     const updatedFormat: DtrFormat = { ...format, ...data };
-    this.dtrFormats.set(id, updatedFormat);
+    this.dtrFormats.set(parseInt(id, 10), updatedFormat);
     return updatedFormat;
   }
 
-  async deleteDtrFormat(id: number): Promise<boolean> {
-    return this.dtrFormats.delete(id);
+  async deleteDtrFormat(id: string): Promise<boolean> {
+    return this.dtrFormats.delete(parseInt(id, 10));
   }
 
   // Unknown DTR Format operations
-  async getUnknownDtrFormat(id: number): Promise<UnknownDtrFormat | undefined> {
-    return this.unknownDtrFormats.get(id);
+  async getUnknownDtrFormat(id: string): Promise<UnknownDtrFormat | undefined> {
+    return this.unknownDtrFormats.get(parseInt(id, 10));
   }
 
   async getAllUnknownDtrFormats(): Promise<UnknownDtrFormat[]> {
@@ -615,17 +602,17 @@ export class MemStorage implements IStorage {
     return newFormat;
   }
 
-  async updateUnknownDtrFormat(id: number, data: Partial<UnknownDtrFormat>): Promise<UnknownDtrFormat | undefined> {
-    const format = this.unknownDtrFormats.get(id);
+  async updateUnknownDtrFormat(id: string, data: Partial<UnknownDtrFormat>): Promise<UnknownDtrFormat | undefined> {
+    const format = this.unknownDtrFormats.get(parseInt(id, 10));
     if (!format) return undefined;
     
     const updatedFormat: UnknownDtrFormat = { ...format, ...data };
-    this.unknownDtrFormats.set(id, updatedFormat);
+    this.unknownDtrFormats.set(parseInt(id, 10), updatedFormat);
     return updatedFormat;
   }
 
-  async deleteUnknownDtrFormat(id: number): Promise<boolean> {
-    return this.unknownDtrFormats.delete(id);
+  async deleteUnknownDtrFormat(id: string): Promise<boolean> {
+    return this.unknownDtrFormats.delete(parseInt(id, 10));
   }
 
   // Clear operations
@@ -651,4 +638,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new MongoDBStorage();

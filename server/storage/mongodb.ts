@@ -1,5 +1,5 @@
 import { IStorage } from '../storage';
-import { Employee, Company, DTR, Payroll, Activity } from '../models';
+import { Employee, Company, DTR, Payroll, Activity, User as UserModel } from '../models';
 import type { 
   Employee as EmployeeType,
   Company as CompanyType,
@@ -21,21 +21,32 @@ import type {
 import mongoose from 'mongoose';
 
 // Helper function to convert MongoDB document to the expected type
-function convertToType<T extends { id: number }>(doc: any): T {
+function convertToType<T extends { id: string }>(doc: any): T {
   if (!doc) return undefined as any;
-  const json = doc.toJSON();
+  const json = doc.toJSON ? doc.toJSON() : doc;
+  const result: any = {
+    ...json,
+    id: (typeof json.id === 'string' && json.id) || json._id?.toString(),
+    companyId: json.companyId?.toString(),
+    employeeId: json.employeeId?.toString(),
+    approvedBy: json.approvedBy?.toString(),
+  };
+  delete result._id;
+  return result as T;
+}
+
+function userToType(user: any): User {
+  if (!user) return undefined as any;
+  const json = user.toJSON();
   return {
     ...json,
-    id: parseInt(json.id),
-    companyId: json.companyId ? parseInt(json.companyId) : undefined,
-    employeeId: json.employeeId ? parseInt(json.employeeId) : undefined,
-    approvedBy: json.approvedBy ? parseInt(json.approvedBy) : undefined
-  } as T;
+    id: json.id || json._id?.toString(),
+  };
 }
 
 export class MongoDBStorage implements IStorage {
   // Employee operations
-  async getEmployee(id: number): Promise<EmployeeType | undefined> {
+  async getEmployee(id: string): Promise<EmployeeType | undefined> {
     const employee = await Employee.findById(id);
     return convertToType<EmployeeType>(employee);
   }
@@ -51,18 +62,18 @@ export class MongoDBStorage implements IStorage {
     return convertToType<EmployeeType>(newEmployee);
   }
 
-  async updateEmployee(id: number, data: Partial<EmployeeType>): Promise<EmployeeType | undefined> {
+  async updateEmployee(id: string, data: Partial<EmployeeType>): Promise<EmployeeType | undefined> {
     const employee = await Employee.findByIdAndUpdate(id, data, { new: true });
     return convertToType<EmployeeType>(employee);
   }
 
-  async deleteEmployee(id: number): Promise<boolean> {
+  async deleteEmployee(id: string): Promise<boolean> {
     const result = await Employee.findByIdAndDelete(id);
     return !!result;
   }
 
   // Company operations
-  async getCompany(id: number): Promise<CompanyType | undefined> {
+  async getCompany(id: string): Promise<CompanyType | undefined> {
     const company = await Company.findById(id);
     return convertToType<CompanyType>(company);
   }
@@ -78,18 +89,18 @@ export class MongoDBStorage implements IStorage {
     return convertToType<CompanyType>(newCompany);
   }
 
-  async updateCompany(id: number, data: Partial<CompanyType>): Promise<CompanyType | undefined> {
+  async updateCompany(id: string, data: Partial<CompanyType>): Promise<CompanyType | undefined> {
     const company = await Company.findByIdAndUpdate(id, data, { new: true });
     return convertToType<CompanyType>(company);
   }
 
-  async deleteCompany(id: number): Promise<boolean> {
+  async deleteCompany(id: string): Promise<boolean> {
     const result = await Company.findByIdAndDelete(id);
     return !!result;
   }
 
   // DTR operations
-  async getDTR(id: number): Promise<DTRType | undefined> {
+  async getDTR(id: string): Promise<DTRType | undefined> {
     const dtr = await DTR.findById(id);
     return convertToType<DTRType>(dtr);
   }
@@ -105,18 +116,18 @@ export class MongoDBStorage implements IStorage {
     return convertToType<DTRType>(newDtr);
   }
 
-  async updateDTR(id: number, data: Partial<DTRType>): Promise<DTRType | undefined> {
+  async updateDTR(id: string, data: Partial<DTRType>): Promise<DTRType | undefined> {
     const dtr = await DTR.findByIdAndUpdate(id, data, { new: true });
     return convertToType<DTRType>(dtr);
   }
 
-  async deleteDTR(id: number): Promise<boolean> {
+  async deleteDTR(id: string): Promise<boolean> {
     const result = await DTR.findByIdAndDelete(id);
     return !!result;
   }
 
   // Payroll operations
-  async getPayroll(id: number): Promise<PayrollType | undefined> {
+  async getPayroll(id: string): Promise<PayrollType | undefined> {
     const payroll = await Payroll.findById(id);
     return convertToType<PayrollType>(payroll);
   }
@@ -132,18 +143,18 @@ export class MongoDBStorage implements IStorage {
     return convertToType<PayrollType>(newPayroll);
   }
 
-  async updatePayroll(id: number, data: Partial<PayrollType>): Promise<PayrollType | undefined> {
+  async updatePayroll(id: string, data: Partial<PayrollType>): Promise<PayrollType | undefined> {
     const payroll = await Payroll.findByIdAndUpdate(id, data, { new: true });
     return convertToType<PayrollType>(payroll);
   }
 
-  async deletePayroll(id: number): Promise<boolean> {
+  async deletePayroll(id: string): Promise<boolean> {
     const result = await Payroll.findByIdAndDelete(id);
     return !!result;
   }
 
   // Activity operations
-  async getActivity(id: number): Promise<ActivityType | undefined> {
+  async getActivity(id: string): Promise<ActivityType | undefined> {
     const activity = await Activity.findById(id);
     return convertToType<ActivityType>(activity);
   }
@@ -194,40 +205,65 @@ export class MongoDBStorage implements IStorage {
     ]);
   }
 
-  // Not implemented operations (to be implemented as needed)
-  async getUser(id: number): Promise<User | undefined> {
-    throw new Error('Method not implemented.');
+  // User operations
+  async getUser(id: string): Promise<User | undefined> {
+    const user = await UserModel.findById(id);
+    return user ? userToType(user) : undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    throw new Error('Method not implemented.');
+    const user = await UserModel.findOne({ username });
+    return user ? userToType(user) : undefined;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    throw new Error('Method not implemented.');
+    const user = await UserModel.findOne({ email });
+    return user ? userToType(user) : undefined;
   }
 
   async getAllUsers(): Promise<User[]> {
-    throw new Error('Method not implemented.');
+    const users = await UserModel.find();
+    return users.map(userToType);
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    throw new Error('Method not implemented.');
+    const newUser = new UserModel(user);
+    await newUser.save();
+    return userToType(newUser);
   }
 
-  async updateUser(id: number, data: Partial<User>): Promise<User | undefined> {
-    throw new Error('Method not implemented.');
+  async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
+    const user = await UserModel.findByIdAndUpdate(id, data, { new: true });
+    return user ? userToType(user) : undefined;
   }
 
-  async deleteUser(id: number): Promise<boolean> {
-    throw new Error('Method not implemented.');
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await UserModel.findByIdAndDelete(id);
+    return !!result;
   }
 
   async clearUsers(): Promise<void> {
-    throw new Error('Method not implemented.');
+    await UserModel.deleteMany({});
   }
 
-  async getDtrFormat(id: number): Promise<DtrFormat | undefined> {
+  // Utility: Ensure default admin user exists
+  async ensureAdminUser(): Promise<void> {
+    const admin = await UserModel.findOne({ username: 'admin' });
+    if (!admin) {
+      await this.createUser({
+        username: 'admin',
+        password: 'admin123',
+        firstName: 'Admin',
+        lastName: 'User',
+        email: 'admin@worktrack.com',
+        role: 'Admin',
+        status: 'Active',
+      });
+    }
+  }
+
+  // Not implemented operations (to be implemented as needed)
+  async getDtrFormat(id: string): Promise<DtrFormat | undefined> {
     throw new Error('Method not implemented.');
   }
 
@@ -239,15 +275,15 @@ export class MongoDBStorage implements IStorage {
     throw new Error('Method not implemented.');
   }
 
-  async updateDtrFormat(id: number, data: Partial<DtrFormat>): Promise<DtrFormat | undefined> {
+  async updateDtrFormat(id: string, data: Partial<DtrFormat>): Promise<DtrFormat | undefined> {
     throw new Error('Method not implemented.');
   }
 
-  async deleteDtrFormat(id: number): Promise<boolean> {
+  async deleteDtrFormat(id: string): Promise<boolean> {
     throw new Error('Method not implemented.');
   }
 
-  async getUnknownDtrFormat(id: number): Promise<UnknownDtrFormat | undefined> {
+  async getUnknownDtrFormat(id: string): Promise<UnknownDtrFormat | undefined> {
     throw new Error('Method not implemented.');
   }
 
@@ -259,11 +295,11 @@ export class MongoDBStorage implements IStorage {
     throw new Error('Method not implemented.');
   }
 
-  async updateUnknownDtrFormat(id: number, data: Partial<UnknownDtrFormat>): Promise<UnknownDtrFormat | undefined> {
+  async updateUnknownDtrFormat(id: string, data: Partial<UnknownDtrFormat>): Promise<UnknownDtrFormat | undefined> {
     throw new Error('Method not implemented.');
   }
 
-  async deleteUnknownDtrFormat(id: number): Promise<boolean> {
+  async deleteUnknownDtrFormat(id: string): Promise<boolean> {
     throw new Error('Method not implemented.');
   }
 
