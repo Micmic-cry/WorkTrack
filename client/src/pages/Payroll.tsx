@@ -132,6 +132,7 @@ const PayrollPage = () => {
     try {
       await apiRequest("PATCH", `/api/payrolls/${payrollId}/mark-paid`, {});
       await queryClient.invalidateQueries({ queryKey: ['/api/payrolls'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/dtrs'] });
       toast({
         title: "Payroll Marked as Paid",
         description: "The payroll has been marked as paid.",
@@ -345,7 +346,7 @@ const PayrollPage = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            ₱{(Array.isArray(payroll.deductions) ? payroll.deductions.reduce((sum, d) => sum + (d.amount || 0), 0) : 0).toFixed(2)}
+                            ₱{(Array.isArray(payroll.deductions) ? payroll.deductions.reduce((sum: number, d: any) => sum + (d.amount || 0), 0) : 0).toFixed(2)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

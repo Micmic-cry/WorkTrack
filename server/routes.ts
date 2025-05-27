@@ -7,7 +7,6 @@ import {
   insertCompanySchema,
   insertDtrSchema,
   insertPayrollSchema,
-  insertActivitySchema,
 } from "@shared/schema";
 import { calculateRegularHours } from "../client/src/lib/utils/dateUtils";
 import { setupAuth } from "./auth";
@@ -27,7 +26,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Middleware to check if user is an admin
   const isAdmin = (req: Request, res: Response, next: NextFunction) => {
-    if (req.isAuthenticated() && req.user?.role === "Admin") {
+    if (req.isAuthenticated() && (req.user as any)?.role === "Admin") {
       return next();
     }
     res.status(403).json({ error: "Admin access required" });
@@ -84,12 +83,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const employee = await storage.createEmployee(req.body);
       // Log activity in the background, do not block response
-      logActivity(req.user?._id || req.user?.id, "employee_added", `Added new employee: ${employee.firstName} ${employee.lastName}`)
+      logActivity((req.user as any)?.id, "employee_added", `Added new employee: ${employee.firstName} ${employee.lastName}`)
         .catch(err => console.error("Failed to log activity:", err));
       res.status(201).json(employee);
     } catch (error) {
       console.error('Failed to create employee:', error);
-      res.status(500).json({ message: "Failed to create employee", error: error.message, stack: error.stack });
+      if (error instanceof Error) {
+        res.status(500).json({ message: "Failed to create employee", error: error.message, stack: error.stack });
+      } else {
+        res.status(500).json({ message: "Failed to create employee", error: String(error) });
+      }
     }
   });
 
@@ -100,7 +103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updatedEmployee) {
         return res.status(404).json({ message: "Employee not found" });
       }
-      logActivity(req.user?._id || req.user?.id, "employee_updated", `Updated employee: ${updatedEmployee.firstName} ${updatedEmployee.lastName}`)
+      logActivity((req.user as any)?.id, "employee_updated", `Updated employee: ${updatedEmployee.firstName} ${updatedEmployee.lastName}`)
         .catch(err => console.error("Failed to log activity:", err));
       res.json(updatedEmployee);
     } catch (error) {
@@ -116,7 +119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Employee not found" });
       }
       const updatedEmployee = await storage.updateEmployee(employeeId, { ...employee, status: "Active" });
-      logActivity(req.user?._id || req.user?.id, "employee_activated", `Activated employee: ${employee.firstName} ${employee.lastName}`)
+      logActivity((req.user as any)?.id, "employee_activated", `Activated employee: ${employee.firstName} ${employee.lastName}`)
         .catch(err => console.error("Failed to log activity:", err));
       res.json(updatedEmployee);
     } catch (error) {
@@ -132,7 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Employee not found" });
       }
       const updatedEmployee = await storage.updateEmployee(employeeId, { ...employee, status: "Inactive" });
-      logActivity(req.user?._id || req.user?.id, "employee_deactivated", `Deactivated employee: ${employee.firstName} ${employee.lastName}`)
+      logActivity((req.user as any)?.id, "employee_deactivated", `Deactivated employee: ${employee.firstName} ${employee.lastName}`)
         .catch(err => console.error("Failed to log activity:", err));
       res.json(updatedEmployee);
     } catch (error) {
@@ -169,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const company = await storage.createCompany(req.body);
       res.status(201).json(company); // Respond immediately
       // Log activity in the background, catch errors
-      logActivity(req.user?._id || req.user?.id, "company_added", `Added new company: ${company.name}`)
+      logActivity((req.user as any)?.id, "company_added", `Added new company: ${company.name}`)
         .catch(err => console.error("Failed to log activity:", err));
     } catch (error) {
       console.error('Error creating company:', error);
@@ -185,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Company not found" });
       }
       res.json(updatedCompany); // Respond immediately
-      logActivity(req.user?._id || req.user?.id, "company_updated", `Updated company: ${updatedCompany.name}`)
+      logActivity((req.user as any)?.id, "company_updated", `Updated company: ${updatedCompany.name}`)
         .catch(err => console.error("Failed to log activity:", err));
     } catch (error) {
       res.status(500).json({ message: "Failed to update company" });
@@ -204,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updatedCompany = await storage.updateCompany(companyId, { ...company, status: "Active" });
       res.json(updatedCompany); // Respond immediately
-      logActivity(req.user?._id || req.user?.id, "company_activated", `Activated company: ${company.name}`)
+      logActivity((req.user as any)?.id, "company_activated", `Activated company: ${company.name}`)
         .catch(err => console.error("Failed to log activity:", err));
     } catch (error) {
       res.status(500).json({ message: "Failed to activate company" });
@@ -223,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updatedCompany = await storage.updateCompany(companyId, { ...company, status: "Inactive" });
       res.json(updatedCompany); // Respond immediately
-      logActivity(req.user?._id || req.user?.id, "company_deactivated", `Deactivated company: ${company.name}`)
+      logActivity((req.user as any)?.id, "company_deactivated", `Deactivated company: ${company.name}`)
         .catch(err => console.error("Failed to log activity:", err));
     } catch (error) {
       res.status(500).json({ message: "Failed to deactivate company" });
@@ -315,7 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employee = await storage.getEmployee(dtr.employeeId);
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${dtr.employeeId}`;
 
-      await logActivity(req.user?._id || req.user?.id, "dtr_submitted", `DTR submitted for ${employeeName} - ${dtr.date}`);
+      await logActivity((req.user as any)?.id, "dtr_submitted", `DTR submitted for ${employeeName} - ${dtr.date}`);
       res.status(201).json(dtr);
     } catch (error) {
       console.error("Failed to create DTR:", error instanceof Error ? error.message : error);
@@ -334,7 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employee = await storage.getEmployee(updatedDTR.employeeId);
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${updatedDTR.employeeId}`;
       
-      await logActivity(req.user?._id || req.user?.id, "dtr_updated", `DTR updated for ${employeeName} - ${updatedDTR.date}`);
+      await logActivity((req.user as any)?.id, "dtr_updated", `DTR updated for ${employeeName} - ${updatedDTR.date}`);
       res.json(updatedDTR);
     } catch (error) {
       res.status(500).json({ message: "Failed to update DTR" });
@@ -358,7 +361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employee = await storage.getEmployee(dtr.employeeId);
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${dtr.employeeId}`;
       
-      await logActivity(req.user?._id || req.user?.id, "dtr_approved", `DTR approved for ${employeeName} - ${dtr.date}`);
+      await logActivity((req.user as any)?.id, "dtr_approved", `DTR approved for ${employeeName} - ${dtr.date}`);
       res.json(updatedDTR);
     } catch (error) {
       res.status(500).json({ message: "Failed to approve DTR" });
@@ -382,7 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employee = await storage.getEmployee(dtr.employeeId);
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${dtr.employeeId}`;
       
-      await logActivity(req.user?._id || req.user?.id, "dtr_rejected", `DTR rejected for ${employeeName} - ${dtr.date}`);
+      await logActivity((req.user as any)?.id, "dtr_rejected", `DTR rejected for ${employeeName} - ${dtr.date}`);
       res.json(updatedDTR);
     } catch (error) {
       res.status(500).json({ message: "Failed to reject DTR" });
@@ -408,7 +411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employee = await storage.getEmployee(dtr.employeeId);
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${dtr.employeeId}`;
       
-      await logActivity(req.user?._id || req.user?.id, "dtr_revision_requested", `Revision requested for ${employeeName}'s DTR - ${dtr.date}`);
+      await logActivity((req.user as any)?.id, "dtr_revision_requested", `Revision requested for ${employeeName}'s DTR - ${dtr.date}`);
       res.json(updatedDTR);
     } catch (error) {
       res.status(500).json({ message: "Failed to request DTR revision" });
@@ -449,7 +452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('Update result:', updatedDTR);
           const employee = await storage.getEmployee(dtr.employeeId);
           const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${dtr.employeeId}`;
-          await logActivity(req.user?._id || req.user?.id, "dtr_approved", `DTR approved for ${employeeName} - ${dtr.date}`);
+          await logActivity((req.user as any)?.id, "dtr_approved", `DTR approved for ${employeeName} - ${dtr.date}`);
           results.push(updatedDTR);
         } catch (error) {
           console.error('Bulk DTR update error:', error, typeof error, JSON.stringify(error));
@@ -457,7 +460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      await logActivity(req.user?._id || req.user?.id, "bulk_dtr_approved", `${results.length} DTRs approved in bulk`);
+      await logActivity((req.user as any)?.id, "bulk_dtr_approved", `${results.length} DTRs approved in bulk`);
       res.json({
         success: true,
         processed: results.length,
@@ -503,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('Update result:', updatedDTR);
           const employee = await storage.getEmployee(dtr.employeeId);
           const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${dtr.employeeId}`;
-          await logActivity(req.user?._id || req.user?.id, "dtr_rejected", `DTR rejected for ${employeeName} - ${dtr.date}`);
+          await logActivity((req.user as any)?.id, "dtr_rejected", `DTR rejected for ${employeeName} - ${dtr.date}`);
           results.push(updatedDTR);
         } catch (error) {
           console.error('Bulk DTR update error:', error, typeof error, JSON.stringify(error));
@@ -511,7 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      await logActivity(req.user?._id || req.user?.id, "bulk_dtr_rejected", `${results.length} DTRs rejected in bulk`);
+      await logActivity((req.user as any)?.id, "bulk_dtr_rejected", `${results.length} DTRs rejected in bulk`);
       res.json({
         success: true,
         processed: results.length,
@@ -581,12 +584,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const payroll = await storage.createPayroll(payrollData);
           results.push(payroll);
           const employeeName = `${employee.firstName} ${employee.lastName}`;
-          await logActivity(req.user?._id || req.user?.id, "payroll_processed", `Payroll processed for ${employeeName} - ${dtr.date}`);
+          await logActivity((req.user as any)?.id, "payroll_processed", `Payroll processed for ${employeeName} - ${dtr.date}`);
         } catch (error) {
           errors.push({ id: dtrId, message: "Failed to process" });
         }
       }
-      await logActivity(req.user?._id || req.user?.id, "bulk_payroll_processed", `${results.length} payrolls processed in bulk`);
+      await logActivity((req.user as any)?.id, "bulk_payroll_processed", `${results.length} payrolls processed in bulk`);
       res.json({
         success: true,
         processed: results.length,
@@ -619,7 +622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         example: req.body.example || "",
       });
       
-      await logActivity(req.user?._id || req.user?.id, "dtr_format_created", `New DTR format created: ${newFormat.name}`);
+      await logActivity((req.user as any)?.id, "dtr_format_created", `New DTR format created: ${newFormat.name}`);
       
       res.status(201).json(newFormat);
     } catch (error) {
@@ -645,7 +648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId: req.body.companyId || null,
       });
       
-      await logActivity(req.user?._id || req.user?.id, "unknown_dtr_format_detected", "New unrecognized DTR format stored for review");
+      await logActivity((req.user as any)?.id, "unknown_dtr_format_detected", "New unrecognized DTR format stored for review");
       
       res.status(201).json(newUnknownFormat);
     } catch (error) {
@@ -680,7 +683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isProcessed: true
       });
       
-      await logActivity(req.user?._id || req.user?.id, "dtr_format_approved", `DTR format approved and added as: ${newFormat.name}`);
+      await logActivity((req.user as any)?.id, "dtr_format_approved", `DTR format approved and added as: ${newFormat.name}`);
       
       res.json({ 
         success: true, 
@@ -711,7 +714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Log the processing attempt
       console.log(`Processing DTR image${employeeId ? ` for employee #${req.params.id}` : ''}`);
-      await logActivity(req.user?._id || req.user?.id, "dtr_processing_attempt", `DTR image processing attempt${employee ? ` for ${employeeName}` : ''}`);
+      await logActivity((req.user as any)?.id, "dtr_processing_attempt", `DTR image processing attempt${employee ? ` for ${employeeName}` : ''}`);
       
       // Return format information to help the client
       res.json({
@@ -762,7 +765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employee = await storage.getEmployee(payroll.employeeId);
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${payroll.employeeId}`;
       
-      await logActivity(req.user?._id || req.user?.id, "payroll_created", `Payroll created for ${employeeName} - ${payroll.payPeriodStart} to ${payroll.payPeriodEnd}`);
+      await logActivity((req.user as any)?.id, "payroll_created", `Payroll created for ${employeeName} - ${payroll.payPeriodStart} to ${payroll.payPeriodEnd}`);
       res.status(201).json(payroll);
     } catch (error) {
       res.status(500).json({ message: "Failed to create payroll" });
@@ -820,7 +823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const payroll = await storage.createPayroll(payrollData);
       const employeeName = `${employee.firstName} ${employee.lastName}`;
       
-      await logActivity(req.user?._id || req.user?.id, "payroll_processed", `Payroll processed for ${employeeName} - ${dtr.date}`);
+      await logActivity((req.user as any)?.id, "payroll_processed", `Payroll processed for ${employeeName} - ${dtr.date}`);
       res.json(payroll);
     } catch (error) {
       res.status(500).json({ message: "Failed to process payroll" });
@@ -890,7 +893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           payrolls.push(payroll);
           // Do NOT update DTRs here; leave them as 'Approved'.
           // (No status change in this loop)
-          await logActivity((req.user && (req.user._id || req.user.id)) ? String(req.user._id || req.user.id) : undefined, "payroll_generated", `Payroll generated for ${employee.firstName} ${employee.lastName} - ${periodStart} to ${periodEnd}`);
+          await logActivity((req.user as any)?.id, "payroll_generated", `Payroll generated for ${employee.firstName} ${employee.lastName} - ${periodStart} to ${periodEnd}`);
         }
       }
       res.json({ message: `${payrolls.length} payrolls generated successfully`, payrolls });
@@ -943,6 +946,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!payroll) {
         return res.status(404).json({ message: "Payroll not found" });
       }
+      // Log the payroll object for debugging
+      console.log('[PAYROLL MARK PAID] Payroll object:', payroll);
+      // Use both possible field names for robustness
+      const periodStart = payroll.payPeriodStart || payroll.periodStart;
+      const periodEnd = payroll.payPeriodEnd || payroll.periodEnd;
       const updatedPayroll = await storage.updatePayroll(payrollId, {
         ...payroll,
         status: "Paid",
@@ -953,11 +961,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dtrsToUpdate = dtrs.filter(dtr =>
         String(dtr.employeeId) === String(payroll.employeeId) &&
         dtr.status !== "Paid" &&
-        new Date(dtr.date) >= new Date(payroll.periodStart) &&
-        new Date(dtr.date) <= new Date(payroll.periodEnd)
+        periodStart && periodEnd &&
+        new Date(dtr.date) >= new Date(periodStart) &&
+        new Date(dtr.date) <= new Date(periodEnd)
       );
+      console.log(`[PAYROLL MARK PAID] PayrollId: ${payrollId}, EmployeeId: ${payroll.employeeId}, periodStart: ${periodStart}, periodEnd: ${periodEnd}`);
+      console.log(`[PAYROLL MARK PAID] DTRs to update to Paid:`, dtrsToUpdate.map(d => ({ _id: d._id, date: d.date, status: d.status })));
       for (const dtr of dtrsToUpdate) {
-        await storage.updateDTR(dtr._id, { ...dtr, status: "Paid" });
+        const dtrId = dtr._id || dtr.id;
+        if (!dtrId) {
+          console.error('[PAYROLL MARK PAID] DTR missing id:', dtr);
+          continue;
+        }
+        const updated = await storage.updateDTR(dtrId, { ...dtr, status: "Paid" });
+        console.log(`[PAYROLL MARK PAID] Updated DTR _id: ${dtrId} to Paid. Result:`, updated);
       }
       res.json(updatedPayroll);
     } catch (error) {
