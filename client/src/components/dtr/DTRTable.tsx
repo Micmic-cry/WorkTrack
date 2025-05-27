@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +35,7 @@ type DTRTableProps = {
   isLoading: boolean;
   employees?: Employee[];
   enableBulkActions?: boolean;
-  onBulkSelect?: (selectedIds: number[]) => void;
+  onBulkSelect?: (selectedIds: string[]) => void;
 };
 
 const DTRTable = ({ 
@@ -46,7 +46,7 @@ const DTRTable = ({
   onBulkSelect
 }: DTRTableProps) => {
   const { toast } = useToast();
-  const [selectedDTRs, setSelectedDTRs] = useState<number[]>([]);
+  const [selectedDTRs, setSelectedDTRs] = useState<string[]>([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [showBulkApproveAlert, setShowBulkApproveAlert] = useState(false);
@@ -58,18 +58,18 @@ const DTRTable = ({
     if (isAllSelected) {
       setSelectedDTRs([]);
     } else {
-      const pendingDTRs = dtrs.filter(dtr => dtr.status === "Pending").map(dtr => dtr.id);
+      const pendingDTRs = dtrs.filter(dtr => dtr.status === "Pending").map(dtr => (dtr as any).id);
       setSelectedDTRs(pendingDTRs);
     }
     setIsAllSelected(!isAllSelected);
     
     if (onBulkSelect) {
-      onBulkSelect(isAllSelected ? [] : dtrs.map(dtr => dtr.id));
+      onBulkSelect(isAllSelected ? [] : dtrs.map(dtr => (dtr as any).id));
     }
   };
   
-  const handleSelectDTR = (dtrId: number, checked: boolean) => {
-    let newSelected: number[];
+  const handleSelectDTR = (dtrId: string, checked: boolean) => {
+    let newSelected: string[];
     if (checked) {
       newSelected = [...selectedDTRs, dtrId];
     } else {
@@ -85,14 +85,14 @@ const DTRTable = ({
     setIsAllSelected(dtrs.length > 0 && newSelected.length === dtrs.length);
   };
 
-  const handleViewDTR = (dtrId: number) => {
+  const handleViewDTR = (dtrId: string) => {
     toast({
       title: "View DTR",
       description: `Viewing DTR #${dtrId}`,
     });
   };
 
-  const handleApproveDTR = async (dtrId: number) => {
+  const handleApproveDTR = async (dtrId: string) => {
     try {
       await apiRequest("PATCH", `/api/dtrs/${dtrId}/approve`, {});
       await queryClient.invalidateQueries({ queryKey: ['/api/dtrs'] });
@@ -109,7 +109,7 @@ const DTRTable = ({
     }
   };
 
-  const handleRejectDTR = async (dtrId: number) => {
+  const handleRejectDTR = async (dtrId: string) => {
     try {
       await apiRequest("PATCH", `/api/dtrs/${dtrId}/reject`, {});
       await queryClient.invalidateQueries({ queryKey: ['/api/dtrs'] });
@@ -126,7 +126,7 @@ const DTRTable = ({
     }
   };
 
-  const handleProcessPayroll = async (dtrId: number) => {
+  const handleProcessPayroll = async (dtrId: string) => {
     try {
       await apiRequest("POST", `/api/payroll/process/${dtrId}`, {});
       await queryClient.invalidateQueries({ queryKey: ['/api/dtrs'] });
@@ -169,6 +169,18 @@ const DTRTable = ({
             Processing
           </span>
         );
+      case "Paid":
+        return (
+          <span className="px-2 py-1 inline-flex text-fit-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+            Paid
+          </span>
+        );
+      case "Processed":
+        return (
+          <span className="px-2 py-1 inline-flex text-fit-xs leading-5 font-semibold rounded-full bg-gray-200 text-gray-800">
+            Processed
+          </span>
+        );
       default:
         return (
           <span className="px-2 py-1 inline-flex text-fit-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
@@ -178,8 +190,8 @@ const DTRTable = ({
     }
   };
 
-  const getEmployeeName = (employeeId: number) => {
-    const employee = employees.find(e => e.id === employeeId);
+  const getEmployeeName = (employeeId: string) => {
+    const employee = employees.find(e => (e as any).id === employeeId);
     return employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${employeeId}`;
   };
 
@@ -281,7 +293,7 @@ const DTRTable = ({
   // Count DTRs by status
   const pendingDTRs = dtrs.filter(dtr => dtr.status === "Pending").length;
   const approvedDTRs = dtrs.filter(dtr => dtr.status === "Approved").length;
-  
+
   return (
     <Card className="overflow-hidden">
       {/* Bulk Action Alerts */}
@@ -438,7 +450,7 @@ const DTRTable = ({
         </div>
       )}
       
-      <div className="w-full overflow-auto max-h-[70vh]">
+      <div className="w-full">
         <table className="w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
@@ -500,106 +512,107 @@ const DTRTable = ({
                   </tr>
                 ))
             ) : dtrs.length > 0 ? (
-              dtrs.map((dtr) => (
-                <tr key={dtr.id} className={`hover:bg-gray-50 ${selectedDTRs.includes(dtr.id) ? 'bg-blue-50' : ''}`}>
-                  {enableBulkActions && (
-                    <td className="pl-6 pr-3 py-4 whitespace-nowrap">
-                      <Checkbox 
-                        id={`select-dtr-${dtr.id}`}
-                        checked={selectedDTRs.includes(dtr.id)}
-                        onCheckedChange={(checked) => handleSelectDTR(dtr.id, !!checked)}
-                      />
+              dtrs.map((dtr) => {
+                console.log('DTR row object:', dtr);
+                return (
+                  <tr key={(dtr as any).id} className={`hover:bg-gray-50 ${selectedDTRs.includes((dtr as any).id) ? 'bg-blue-50' : ''}`}
+                    onClick={() => console.log('Row clicked:', (dtr as any).id, (dtr as any).status)}
+                  >
+                    {enableBulkActions && (
+                      <td className="pl-6 pr-3 py-4 whitespace-nowrap">
+                        <Checkbox 
+                          id={`select-dtr-${(dtr as any).id}`}
+                          checked={selectedDTRs.includes((dtr as any).id)}
+                          onCheckedChange={(checked) => handleSelectDTR((dtr as any).id, !!checked)}
+                        />
+                      </td>
+                    )}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-fit-sm font-medium text-gray-900 truncate max-w-[180px]" title={getEmployeeName((dtr as any).employeeId)}>
+                        {getEmployeeName((dtr as any).employeeId)}
+                      </div>
                     </td>
-                  )}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-fit-sm font-medium text-gray-900 truncate max-w-[180px]" title={getEmployeeName(dtr.employeeId)}>
-                      {getEmployeeName(dtr.employeeId)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-fit-sm text-gray-900 truncate-dynamic">{dtr.date}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-fit-sm text-gray-900 truncate-dynamic">
-                      {dtr.timeIn} - {dtr.timeOut}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-fit-sm text-gray-900 truncate-dynamic">
-                      {dtr.regularHours} hrs
-                      {dtr.overtimeHours > 0 && (
-                        <span className="ml-1 text-primary">
-                          (+{dtr.overtimeHours} OT)
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-fit-sm text-gray-900 truncate-dynamic">{dtr.type}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(dtr.status)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Tooltip content="DTR Actions">
-                          <Button variant="ghost" size="icon" className="hover:bg-gray-100 transition-colors">
-                            <MoreVertical className="h-4 w-4" />
-                            <span className="sr-only">Open menu</span>
-                          </Button>
-                        </Tooltip>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel className="text-fit-sm">Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => handleViewDTR(dtr.id)}
-                          className="hover:bg-gray-100 cursor-pointer text-fit-sm"
-                        >
-                          <Eye className="mr-2 h-4 w-4 flex-shrink-0" />
-                          <span className="truncate-dynamic">View Details</span>
-                        </DropdownMenuItem>
-                        {dtr.status === "Pending" && (
-                          <>
-                            <DropdownMenuItem 
-                              onClick={() => handleApproveDTR(dtr.id)}
-                              className="hover:bg-green-50 cursor-pointer text-fit-sm"
-                            >
-                              <CheckCircle className="mr-2 h-4 w-4 text-success flex-shrink-0" />
-                              <span className="truncate-dynamic">Approve</span>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-fit-sm text-gray-900 truncate-dynamic">{(dtr as any).date}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-fit-sm text-gray-900 truncate-dynamic">
+                        {(dtr as any).timeIn} - {(dtr as any).timeOut}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-fit-sm text-gray-900 truncate-dynamic">
+                        {(dtr as any).regularHours} hrs
+                        {(dtr as any).overtimeHours > 0 && (
+                          <span className="ml-1 text-primary">
+                            (+{(dtr as any).overtimeHours} OT)
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-fit-sm text-gray-900 truncate-dynamic">{(dtr as any).type}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge((dtr as any).status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="relative">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleViewDTR((dtr as any).id)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
                             </DropdownMenuItem>
                             <DropdownMenuItem 
-                              onClick={() => handleRejectDTR(dtr.id)}
-                              className="hover:bg-red-50 cursor-pointer text-fit-sm"
+                              onClick={() => {
+                                console.log('Approve clicked for DTR:', (dtr as any).id, (dtr as any).status);
+                                if ((dtr as any).status === 'Pending') handleApproveDTR((dtr as any).id);
+                              }}
+                              disabled={(dtr as any).status !== 'Pending'}
+                              className={(dtr as any).status !== 'Pending' ? 'opacity-50 cursor-not-allowed' : ''}
                             >
-                              <XCircle className="mr-2 h-4 w-4 text-error flex-shrink-0" />
-                              <span className="truncate-dynamic">Reject</span>
+                              <CheckCircle className="mr-2 h-4 w-4 text-success" />
+                              Approve
                             </DropdownMenuItem>
-                          </>
-                        )}
-                        {dtr.status === "Approved" && (
-                          <DropdownMenuItem 
-                            onClick={() => handleProcessPayroll(dtr.id)}
-                            className="hover:bg-blue-50 cursor-pointer text-fit-sm"
-                          >
-                            <CreditCard className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
-                            <span className="truncate-dynamic">Process Payroll</span>
-                          </DropdownMenuItem>
-                        )}
-                        {dtr.status === "Rejected" && (
-                          <DropdownMenuItem
-                            className="hover:bg-yellow-50 cursor-pointer text-fit-sm"
-                          >
-                            <Edit className="mr-2 h-4 w-4 text-warning flex-shrink-0" />
-                            <span className="truncate-dynamic">Request Revision</span>
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                console.log('Reject clicked for DTR:', (dtr as any).id, (dtr as any).status);
+                                if ((dtr as any).status === 'Pending') handleRejectDTR((dtr as any).id);
+                              }}
+                              disabled={(dtr as any).status !== 'Pending'}
+                              className={(dtr as any).status !== 'Pending' ? 'opacity-50 cursor-not-allowed' : ''}
+                            >
+                              <XCircle className="mr-2 h-4 w-4 text-error" />
+                              Reject
+                            </DropdownMenuItem>
+                            {(dtr as any).status === "Approved" && (
+                              <DropdownMenuItem onClick={() => handleProcessPayroll((dtr as any).id)}>
+                                <CreditCard className="mr-2 h-4 w-4 text-primary" />
+                                Process Payroll
+                              </DropdownMenuItem>
+                            )}
+                            {(dtr as any).status === "Rejected" && (
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4 text-warning" />
+                                Request Revision
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td

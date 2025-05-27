@@ -70,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/employees/:id", async (req, res) => {
     try {
-      const employee = await storage.getEmployee(parseInt(req.params.id));
+      const employee = await storage.getEmployee(req.params.id);
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
@@ -95,7 +95,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/employees/:id", async (req, res) => {
     try {
-      const employeeId = parseInt(req.params.id);
+      const employeeId = req.params.id;
       const updatedEmployee = await storage.updateEmployee(employeeId, req.body);
       if (!updatedEmployee) {
         return res.status(404).json({ message: "Employee not found" });
@@ -110,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/employees/:id/activate", async (req, res) => {
     try {
-      const employeeId = parseInt(req.params.id);
+      const employeeId = req.params.id;
       const employee = await storage.getEmployee(employeeId);
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
@@ -126,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/employees/:id/deactivate", async (req, res) => {
     try {
-      const employeeId = parseInt(req.params.id);
+      const employeeId = req.params.id;
       const employee = await storage.getEmployee(employeeId);
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
@@ -283,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/dtrs/:id", async (req, res) => {
     try {
-      const dtr = await storage.getDTR(parseInt(req.params.id));
+      const dtr = await storage.getDTR(req.params.id);
       if (!dtr) {
         return res.status(404).json({ message: "DTR not found" });
       }
@@ -318,13 +318,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await logActivity(req.user?._id || req.user?.id, "dtr_submitted", `DTR submitted for ${employeeName} - ${dtr.date}`);
       res.status(201).json(dtr);
     } catch (error) {
+      console.error("Failed to create DTR:", error instanceof Error ? error.message : error);
       res.status(500).json({ message: "Failed to create DTR" });
     }
   });
 
   app.patch("/api/dtrs/:id", async (req, res) => {
     try {
-      const dtrId = parseInt(req.params.id);
+      const dtrId = req.params.id;
       const updatedDTR = await storage.updateDTR(dtrId, req.body);
       if (!updatedDTR) {
         return res.status(404).json({ message: "DTR not found" });
@@ -342,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/dtrs/:id/approve", async (req, res) => {
     try {
-      const dtrId = parseInt(req.params.id);
+      const dtrId = req.params.id;
       const dtr = await storage.getDTR(dtrId);
       if (!dtr) {
         return res.status(404).json({ message: "DTR not found" });
@@ -351,7 +352,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedDTR = await storage.updateDTR(dtrId, { 
         ...dtr,
         status: "Approved",
-        approvedBy: 1, // Admin user ID
         approvalDate: format(new Date(), "yyyy-MM-dd")
       });
       
@@ -367,7 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/dtrs/:id/reject", async (req, res) => {
     try {
-      const dtrId = parseInt(req.params.id);
+      const dtrId = req.params.id;
       const dtr = await storage.getDTR(dtrId);
       if (!dtr) {
         return res.status(404).json({ message: "DTR not found" });
@@ -376,7 +376,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedDTR = await storage.updateDTR(dtrId, { 
         ...dtr,
         status: "Rejected",
-        approvedBy: 1, // Admin user ID
         approvalDate: format(new Date(), "yyyy-MM-dd")
       });
       
@@ -392,7 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/dtrs/:id/request-revision", async (req, res) => {
     try {
-      const dtrId = parseInt(req.params.id);
+      const dtrId = req.params.id;
       const dtr = await storage.getDTR(dtrId);
       if (!dtr) {
         return res.status(404).json({ message: "DTR not found" });
@@ -441,19 +440,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
           
-          const updatedDTR = await storage.updateDTR(dtrId, {
-            ...dtr,
+          const updateObj = {
             status: "Approved",
-            approvedBy: 1, // Admin user ID
             approvalDate: format(new Date(), "yyyy-MM-dd")
-          });
-          
+          };
+          console.log('Attempting to update DTR:', dtrId, updateObj);
+          const updatedDTR = await storage.updateDTR(dtrId, updateObj);
+          console.log('Update result:', updatedDTR);
           const employee = await storage.getEmployee(dtr.employeeId);
           const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${dtr.employeeId}`;
-          
           await logActivity(req.user?._id || req.user?.id, "dtr_approved", `DTR approved for ${employeeName} - ${dtr.date}`);
           results.push(updatedDTR);
         } catch (error) {
+          console.error('Bulk DTR update error:', error, typeof error, JSON.stringify(error));
           errors.push({ id: dtrId, message: "Failed to process" });
         }
       }
@@ -495,19 +494,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
           
-          const updatedDTR = await storage.updateDTR(dtrId, {
-            ...dtr,
+          const updateObj = {
             status: "Rejected",
-            approvedBy: 1, // Admin user ID
             approvalDate: format(new Date(), "yyyy-MM-dd")
-          });
-          
+          };
+          console.log('Attempting to update DTR:', dtrId, updateObj);
+          const updatedDTR = await storage.updateDTR(dtrId, updateObj);
+          console.log('Update result:', updatedDTR);
           const employee = await storage.getEmployee(dtr.employeeId);
           const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${dtr.employeeId}`;
-          
           await logActivity(req.user?._id || req.user?.id, "dtr_rejected", `DTR rejected for ${employeeName} - ${dtr.date}`);
           results.push(updatedDTR);
         } catch (error) {
+          console.error('Bulk DTR update error:', error, typeof error, JSON.stringify(error));
           errors.push({ id: dtrId, message: "Failed to process" });
         }
       }
@@ -529,14 +528,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/dtrs/bulk/process-payroll", async (req, res) => {
     try {
       const { dtrIds } = req.body;
-      
       if (!dtrIds || !Array.isArray(dtrIds) || dtrIds.length === 0) {
         return res.status(400).json({ message: "No DTR IDs provided" });
       }
-      
       const results = [];
       const errors = [];
-      
       for (const dtrId of dtrIds) {
         try {
           const dtr = await storage.getDTR(dtrId);
@@ -544,41 +540,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             errors.push({ id: dtrId, message: "DTR not found" });
             continue;
           }
-          
           if (dtr.status !== "Approved") {
             errors.push({ id: dtrId, message: "DTR must be in Approved status to process payroll" });
             continue;
           }
-          
-          // Mark DTR as processing
-          await storage.updateDTR(dtrId, {
-            ...dtr,
-            status: "Processing"
-          });
-          
           // Find the employee to get the salary
           const employee = await storage.getEmployee(dtr.employeeId);
           if (!employee) {
             errors.push({ id: dtrId, message: "Employee not found" });
             continue;
           }
-          
           const salary = employee.salary;
           const regularHours = dtr.regularHours;
           const overtimeHours = dtr.overtimeHours || 0;
-          
           // Calculate pay
           const regularPay = regularHours * salary;
           const overtimePay = overtimeHours * salary * 1.5; // Assuming 1.5x for overtime
           const grossPay = regularPay + overtimePay;
-          
           // Apply standard deductions (simplified for demo)
           const taxRate = 0.15; // 15% tax
           const taxDeduction = grossPay * taxRate;
           const otherDeductions = 0; // Can be customized
           const totalDeductions = taxDeduction + otherDeductions;
           const netPay = grossPay - totalDeductions;
-          
           // Create a payroll record
           const payrollData = {
             employeeId: dtr.employeeId,
@@ -594,17 +578,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             processedBy: 1,
             processedDate: format(new Date(), "yyyy-MM-dd"),
           };
-          
           const payroll = await storage.createPayroll(payrollData);
           results.push(payroll);
-          
           const employeeName = `${employee.firstName} ${employee.lastName}`;
           await logActivity(req.user?._id || req.user?.id, "payroll_processed", `Payroll processed for ${employeeName} - ${dtr.date}`);
         } catch (error) {
           errors.push({ id: dtrId, message: "Failed to process" });
         }
       }
-      
       await logActivity(req.user?._id || req.user?.id, "bulk_payroll_processed", `${results.length} payrolls processed in bulk`);
       res.json({
         success: true,
@@ -725,11 +706,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get all known DTR formats
       const formats = await storage.getAllDtrFormats();
-      const employee = employeeId ? await storage.getEmployee(parseInt(employeeId)) : null;
+      const employee = employeeId ? await storage.getEmployee(req.params.id) : null;
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : undefined;
       
       // Log the processing attempt
-      console.log(`Processing DTR image${employeeId ? ` for employee #${employeeId}` : ''}`);
+      console.log(`Processing DTR image${employeeId ? ` for employee #${req.params.id}` : ''}`);
       await logActivity(req.user?._id || req.user?.id, "dtr_processing_attempt", `DTR image processing attempt${employee ? ` for ${employeeName}` : ''}`);
       
       // Return format information to help the client
@@ -764,7 +745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/payrolls/:id", async (req, res) => {
     try {
-      const payroll = await storage.getPayroll(parseInt(req.params.id));
+      const payroll = await storage.getPayroll(req.params.id);
       if (!payroll) {
         return res.status(404).json({ message: "Payroll not found" });
       }
@@ -790,7 +771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/payroll/process/:dtrId", async (req, res) => {
     try {
-      const dtrId = parseInt(req.params.dtrId);
+      const dtrId = req.params.dtrId;
       const dtr = await storage.getDTR(dtrId);
       if (!dtr) {
         return res.status(404).json({ message: "DTR not found" });
@@ -847,95 +828,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/payrolls/generate", async (req, res) => {
+    console.log('HIT PAYROLL GENERATE ENDPOINT');
     try {
       const { periodStart, periodEnd } = req.body;
-      
+      console.log("[PAYROLL GENERATE] periodStart:", periodStart, "periodEnd:", periodEnd);
       // For demo purposes, we'll create payrolls for all active employees
       const employees = await storage.getAllEmployees();
       const activeEmployees = employees.filter(emp => emp.status === "Active");
-      
+      console.log("[PAYROLL GENERATE] Active employees:", activeEmployees.map(e => ({ id: e.id || e._id, name: e.firstName + ' ' + e.lastName })));
       const payrolls = [];
       for (const employee of activeEmployees) {
         // Get approved DTRs for this employee in the period
         const dtrs = await storage.getAllDTRs();
+        // Fix employeeId comparison for string/ObjectId
         const employeeDtrs = dtrs.filter(dtr => 
-          dtr.employeeId === employee.id && 
+          (String(dtr.employeeId) === String(employee._id || employee.id)) && 
           dtr.status === "Approved" &&
           new Date(dtr.date) >= new Date(periodStart) &&
           new Date(dtr.date) <= new Date(periodEnd)
         );
-        
         if (employeeDtrs.length > 0) {
+          // Check if payroll already exists for this employee and period
+          const allPayrolls = await storage.getAllPayrolls();
+          const alreadyExists = allPayrolls.some(p => 
+            String(p.employeeId) === String(employee._id || employee.id) &&
+            p.payPeriodStart === periodStart &&
+            p.payPeriodEnd === periodEnd
+          );
+          if (alreadyExists) {
+            continue; // Skip duplicate
+          }
           // Calculate total hours and pay
           let totalRegularHours = 0;
           let totalOvertimeHours = 0;
-          
           employeeDtrs.forEach(dtr => {
             totalRegularHours += dtr.regularHours;
             totalOvertimeHours += dtr.overtimeHours || 0;
           });
-          
           const regularPay = totalRegularHours * employee.salary;
           const overtimePay = totalOvertimeHours * employee.salary * 1.25;
           const grossPay = regularPay + overtimePay;
-          const totalDeductions = grossPay * 0.1; // 10% deduction for demo
+          const taxDeduction = grossPay * 0.1; // 10% deduction for demo
+          const sssDeduction = 0; // Add logic if needed
+          const philhealthDeduction = 0; // Add logic if needed
+          const totalDeductions = taxDeduction + sssDeduction + philhealthDeduction;
           const netPay = grossPay - totalDeductions;
-          
           const payrollData = {
-            employeeId: employee.id,
-            payPeriodStart: periodStart,
-            payPeriodEnd: periodEnd,
-            totalRegularHours,
-            totalOvertimeHours,
-            grossPay,
-            totalDeductions,
-            netPay,
+            employeeId: employee._id || employee.id,
+            periodStart: periodStart,
+            periodEnd: periodEnd,
+            basicPay: regularPay,
+            overtimePay: overtimePay,
+            deductions: [
+              { type: "Tax", amount: taxDeduction, description: "Withholding tax" },
+              // Add SSS, PhilHealth, etc. if needed
+            ],
+            netPay: netPay,
             status: "Pending",
-            processedBy: 1,
-            processedDate: format(new Date(), "yyyy-MM-dd")
           };
-          
           const payroll = await storage.createPayroll(payrollData);
           payrolls.push(payroll);
-          
-          // Update DTRs to processing
-          for (const dtr of employeeDtrs) {
-            await storage.updateDTR(dtr.id, {
-              ...dtr,
-              status: "Processing"
-            });
-          }
-          
-          await logActivity(req.user?._id || req.user?.id, "payroll_generated", `Payroll generated for ${employee.firstName} ${employee.lastName} - ${periodStart} to ${periodEnd}`);
+          // Do NOT update DTRs here; leave them as 'Approved'.
+          // (No status change in this loop)
+          await logActivity((req.user && (req.user._id || req.user.id)) ? String(req.user._id || req.user.id) : undefined, "payroll_generated", `Payroll generated for ${employee.firstName} ${employee.lastName} - ${periodStart} to ${periodEnd}`);
         }
       }
-      
       res.json({ message: `${payrolls.length} payrolls generated successfully`, payrolls });
     } catch (error) {
-      res.status(500).json({ message: "Failed to generate payrolls" });
+      console.error("[PAYROLL GENERATE] ERROR:", error, (error instanceof Error ? error.stack : ''));
+      res.status(500).json({ message: "Failed to generate payrolls", error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : '' });
     }
   });
 
   app.patch("/api/payrolls/:id/process", async (req, res) => {
     try {
-      const payrollId = parseInt(req.params.id);
+      const payrollId = req.params.id;
       const payroll = await storage.getPayroll(payrollId);
       if (!payroll) {
         return res.status(404).json({ message: "Payroll not found" });
       }
-      
       const updatedPayroll = await storage.updatePayroll(payrollId, {
         ...payroll,
         status: "Processed",
         processedBy: 1,
         processedDate: format(new Date(), "yyyy-MM-dd")
       });
-      
       const employee = await storage.getEmployee(payroll.employeeId);
-      const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${payroll.employeeId}`
+      const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Employee #${payroll.employeeId}`;
 
+      // --- NEW: Update DTRs in this pay period to 'Processed' ---
+      const dtrs = await storage.getAllDTRs();
+      const dtrsToUpdate = dtrs.filter(dtr =>
+        dtr.employeeId == payroll.employeeId &&
+        dtr.status === "Processing" &&
+        new Date(dtr.date) >= new Date(payroll.payPeriodStart) &&
+        new Date(dtr.date) <= new Date(payroll.payPeriodEnd)
+      );
+      for (const dtr of dtrsToUpdate) {
+        const updated = await storage.updateDTR(dtr._id, { ...dtr, status: "Processed" });
+        console.log(`[DTR STATUS UPDATE] DTR _id: ${dtr._id} set to Processed. Result:`, updated);
+      }
+      // --- END NEW ---
+
+      res.json(updatedPayroll);
     } catch (error) {
       res.status(500).json({ message: "Failed to process payroll" });
+    }
+  });
+
+  app.patch("/api/payrolls/:id/mark-paid", async (req, res) => {
+    try {
+      const payrollId = req.params.id;
+      const payroll = await storage.getPayroll(payrollId);
+      if (!payroll) {
+        return res.status(404).json({ message: "Payroll not found" });
+      }
+      const updatedPayroll = await storage.updatePayroll(payrollId, {
+        ...payroll,
+        status: "Paid",
+        paymentDate: format(new Date(), "yyyy-MM-dd")
+      });
+      // Update DTRs in this pay period to 'Paid'
+      const dtrs = await storage.getAllDTRs();
+      const dtrsToUpdate = dtrs.filter(dtr =>
+        String(dtr.employeeId) === String(payroll.employeeId) &&
+        dtr.status !== "Paid" &&
+        new Date(dtr.date) >= new Date(payroll.periodStart) &&
+        new Date(dtr.date) <= new Date(payroll.periodEnd)
+      );
+      for (const dtr of dtrsToUpdate) {
+        await storage.updateDTR(dtr._id, { ...dtr, status: "Paid" });
+      }
+      res.json(updatedPayroll);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark payroll as paid" });
     }
   });
 

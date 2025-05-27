@@ -8,7 +8,7 @@ const dtrSchema = new mongoose.Schema({
     type: String, 
     enum: [
       'Present', 'Absent', 'Late', 'On Leave',
-      'Pending', 'Approved', 'Rejected', 'Processing'
+      'Pending', 'Approved', 'Rejected', 'Processing', 'Processed', 'Paid'
     ], 
     required: true 
   },

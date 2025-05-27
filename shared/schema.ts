@@ -43,7 +43,7 @@ export const dtrSchema = z.object({
   overtimeHours: z.number().default(0),
   remarks: z.string().optional(),
   type: z.enum(["Daily", "Bi-Weekly", "Project-based"]),
-  status: z.enum(["Pending", "Approved", "Rejected", "Processing"]),
+  status: z.enum(["Pending", "Approved", "Rejected", "Paid"]),
   submissionDate: z.string(),
   approvedBy: z.string().optional(),
   approvalDate: z.string().optional(),

@@ -146,35 +146,37 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
           <FormField
             control={form.control}
             name="employeeId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Employee</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  value={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select employee" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {isLoading ? (
-                      <SelectItem key="loading" value="loading">Loading employees...</SelectItem>
-                    ) : employees.length > 0 ? (
-                      employees.map((employee) => (
-                        <SelectItem key={employee._id} value={employee._id}>
-                          {employee.firstName} {employee.lastName}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem key="none" value="none">No employees available</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
+            render={({ field }) => {
+              return (
+                <FormItem>
+                  <FormLabel>Employee</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select employee" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {isLoading ? (
+                        <SelectItem key="loading" value="loading">Loading employees...</SelectItem>
+                      ) : employees.length > 0 ? (
+                        employees.map((employee) => (
+                          <SelectItem key={(employee as any).id || employee._id} value={(employee as any).id || employee._id}>
+                            {employee.firstName} {employee.lastName}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem key="none" value="none">No employees available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
           />
 
           <FormField

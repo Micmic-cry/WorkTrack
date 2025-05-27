@@ -340,12 +340,12 @@ const PayrollPage = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            ₱{payroll.grossPay.toFixed(2)}
+                            ₱{((payroll.basicPay || 0) + (payroll.overtimePay || 0)).toFixed(2)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            ₱{payroll.totalDeductions.toFixed(2)}
+                            ₱{(Array.isArray(payroll.deductions) ? payroll.deductions.reduce((sum, d) => sum + (d.amount || 0), 0) : 0).toFixed(2)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

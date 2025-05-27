@@ -11,6 +11,7 @@ import DTRForm from "@/components/dtr/DTRForm";
 import DTRCapture from "@/components/dtr/DTRCapture";
 import { Plus, Search, Filter, Camera, Upload, Check, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { DTR, Employee } from "@shared/schema";
 
 const DTRManagement = () => {
   const [location, setLocation] = useLocation();
@@ -20,21 +21,21 @@ const DTRManagement = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState(searchParams.get("status") || "all");
   const [dtrType, setDtrType] = useState("all");
-  const [selectedDTRs, setSelectedDTRs] = useState<number[]>([]);
+  const [selectedDTRs, setSelectedDTRs] = useState<string[]>([]);
   const [enableBulkActions, setEnableBulkActions] = useState(false);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: dtrs, isLoading } = useQuery({
+  const { data: dtrs = [], isLoading } = useQuery<DTR[]>({
     queryKey: ['/api/dtrs'],
   });
   
-  const { data: employees, isLoading: isEmployeesLoading } = useQuery({
+  const { data: employees = [], isLoading: isEmployeesLoading } = useQuery<Employee[]>({
     queryKey: ['/api/employees'],
   });
 
-  const filteredDTRs = dtrs?.filter((dtr) => {
+  const filteredDTRs: DTR[] = dtrs.filter((dtr: any) => {
     // Filter by search query (employee name would be implemented in a real app)
     const matchesQuery =
       searchQuery === "" || dtr.employeeId.toString().includes(searchQuery);
@@ -82,7 +83,7 @@ const DTRManagement = () => {
     });
   };
   
-  const handleDTRSelection = (selectedIds: number[]) => {
+  const handleDTRSelection = (selectedIds: string[]) => {
     setSelectedDTRs(selectedIds);
   };
 
