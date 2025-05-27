@@ -81,10 +81,6 @@ const EmployeeDTR = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold tracking-tight">My Daily Time Records</h1>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex items-center gap-1">
-            <Clock className="w-4 h-4" />
-            Clock In/Out
-          </Button>
           <Button size="sm" className="flex items-center gap-1" onClick={() => setShowDTRDialog(true)}>
             <FileUp className="w-4 h-4" />
             Submit DTR

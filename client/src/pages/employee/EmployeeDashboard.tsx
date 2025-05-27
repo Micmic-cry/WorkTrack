@@ -31,14 +31,14 @@ const EmployeeDashboard = () => {
 
   // Fetch full employee profile for the logged-in user
   const { data: employeeProfile } = useQuery({
-    queryKey: ["/api/employees", user?.id],
+    queryKey: ["/api/employees", user?._id],
     queryFn: async () => {
-      if (!user?.id) return null;
-      const res = await fetch(`/api/employees/${user.id}`);
+      if (!user?._id) return null;
+      const res = await fetch(`/api/employees/${user._id}`);
       if (!res.ok) return null;
       return await res.json();
     },
-    enabled: !!user?.id,
+    enabled: !!user?._id,
   });
 
   return (
@@ -46,10 +46,6 @@ const EmployeeDashboard = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold tracking-tight">Welcome, {user?.firstName}!</h1>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex items-center gap-1" onClick={() => setShowClockDialog(true)}>
-            <Clock className="w-4 h-4" />
-            Clock In/Out
-          </Button>
           <Button size="sm" className="flex items-center gap-1" onClick={() => setShowDTRDialog(true)}>
             <FileText className="w-4 h-4" />
             Submit DTR
@@ -58,23 +54,7 @@ const EmployeeDashboard = () => {
       </div>
 
       {/* Daily Time Record Status */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Current DTR Status</CardTitle>
-            <CardDescription>Today's time record</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-2xl font-bold">Not Clocked In</p>
-                <p className="text-xs text-gray-500">Last activity: Yesterday, 5:30 PM</p>
-              </div>
-              <Clock className="h-8 w-8 text-gray-400" />
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">This Week</CardTitle>
@@ -186,20 +166,6 @@ const EmployeeDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Clock In/Out Dialog */}
-      <Dialog open={showClockDialog} onOpenChange={setShowClockDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Clock In / Out</DialogTitle>
-          </DialogHeader>
-          <DTRForm
-            onSubmit={() => setShowClockDialog(false)}
-            onCancel={() => setShowClockDialog(false)}
-            employees={employeeProfile ? [employeeProfile] : []}
-            isLoading={false}
-          />
-        </DialogContent>
-      </Dialog>
       {/* Submit DTR Dialog */}
       <Dialog open={showDTRDialog} onOpenChange={setShowDTRDialog}>
         <DialogContent className="max-w-md">

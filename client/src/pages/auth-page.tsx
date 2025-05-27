@@ -84,9 +84,21 @@ export default function AuthPage() {
       confirmPassword: "",
       firstName: "",
       lastName: "",
-      role: "User",
+      role: "Staff",
     },
   });
+
+  useEffect(() => {
+    if (activeTab === "register") {
+      console.log("Rendering registration form");
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === "register") {
+      console.log('Register form errors:', registerForm.formState.errors);
+    }
+  }, [activeTab, registerForm.formState.errors]);
 
   async function onLoginSubmit(data: LoginFormValues) {
     try {
@@ -102,9 +114,11 @@ export default function AuthPage() {
   }
 
   async function onRegisterSubmit(data: RegisterFormValues) {
+    console.log('Register form submitted:', data);
     try {
       // Remove confirmPassword before submitting
       const { confirmPassword, ...registrationData } = data;
+      console.log('Registration data sent to backend:', registrationData);
       await registerMutation.mutateAsync(registrationData);
       toast({
         title: "Registration successful",
@@ -415,6 +429,8 @@ export default function AuthPage() {
                                 </FormItem>
                               )}
                             />
+                            {/* Hidden status field required by schema */}
+                            <input type="hidden" value="Active" {...registerForm.register("status")} />
                             <div className="flex items-center space-x-2 mb-2">
                               <Checkbox id="showRegisterPasswords" 
                                 checked={showRegisterPassword && showRegisterConfirmPassword}
@@ -430,10 +446,19 @@ export default function AuthPage() {
                                 Show passwords
                               </label>
                             </div>
+                            {/* Show all validation errors */}
+                            {Object.values(registerForm.formState.errors).length > 0 && (
+                              <div className="mb-2 text-red-600 text-sm">
+                                {Object.entries(registerForm.formState.errors).map(([field, error]) => (
+                                  <div key={field}>{error?.message as string}</div>
+                                ))}
+                              </div>
+                            )}
                             <Button 
                               type="submit" 
                               className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary" 
                               disabled={registerMutation.isPending}
+                              onClick={() => console.log('Register button clicked')}
                             >
                               {registerMutation.isPending ? (
                                 <>

@@ -19,6 +19,7 @@ import { insertDtrSchema, Employee } from "@shared/schema";
 import { format } from "date-fns";
 import { z } from "zod";
 import { calculateRegularHours } from "@/lib/utils/dateUtils";
+import { useAuth } from "@/hooks/use-auth";
 
 const formSchema = insertDtrSchema.extend({
   timeIn: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, {
@@ -50,6 +51,7 @@ type DTRFormProps = {
 };
 
 const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false }: DTRFormProps) => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const isEditing = !!dtrId;
   const today = format(new Date(), "yyyy-MM-dd");
@@ -58,7 +60,7 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      employeeId: "",
+      employeeId: user && user.role !== "Admin" ? user._id : "",
       date: today,
       timeIn: "08:00",
       timeOut: "17:00",
@@ -132,52 +134,57 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
   };
 
   useEffect(() => {
-    // If there are employees and no employeeId is selected, set the first one as default
-    if (employees.length > 0 && !form.getValues("employeeId")) {
+    // If user is not admin, set employeeId to their own id
+    if (user && user.role !== "Admin") {
+      form.setValue("employeeId", user._id);
+    } else if (employees.length > 0 && !form.getValues("employeeId")) {
       form.setValue("employeeId", employees[0]._id);
       handleEmployeeChange(employees[0]._id);
     }
-  }, [employees]);
+  }, [employees, user]);
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="employeeId"
-            render={({ field }) => {
-              return (
-                <FormItem>
-                  <FormLabel>Employee</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select employee" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {isLoading ? (
-                        <SelectItem key="loading" value="loading">Loading employees...</SelectItem>
-                      ) : employees.length > 0 ? (
-                        employees.map((employee) => (
-                          <SelectItem key={(employee as any).id || employee._id} value={(employee as any).id || employee._id}>
-                            {employee.firstName} {employee.lastName}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem key="none" value="none">No employees available</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              );
-            }}
-          />
+          {/* Only show Employee dropdown for Admins/Managers */}
+          {user && user.role === "Admin" && (
+            <FormField
+              control={form.control}
+              name="employeeId"
+              render={({ field }) => {
+                return (
+                  <FormItem>
+                    <FormLabel>Employee</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select employee" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {isLoading ? (
+                          <SelectItem key="loading" value="loading">Loading employees...</SelectItem>
+                        ) : employees.length > 0 ? (
+                          employees.map((employee) => (
+                            <SelectItem key={employee._id} value={employee._id}>
+                              {employee.firstName} {employee.lastName}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem key="none" value="none">No employees available</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+          )}
 
           <FormField
             control={form.control}
