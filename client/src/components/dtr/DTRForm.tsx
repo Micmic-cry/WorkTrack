@@ -143,6 +143,16 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
     }
   }, [employees, user]);
 
+  // Debug: Log employees array at mount
+  useEffect(() => {
+    console.log('DTRForm employees array:', employees);
+  }, [employees]);
+
+  // Debug: Log default value at form initialization
+  useEffect(() => {
+    console.log('DTRForm default employeeId:', user && user.role !== "Admin" ? user._id : "", form.getValues("employeeId"));
+  }, []);
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -157,26 +167,36 @@ const DTRForm = ({ onSubmit, onCancel, dtrId, employees = [], isLoading = false 
                   <FormItem>
                     <FormLabel>Employee</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
+                      key={employees.length + '-' + String(field.value)}
+                      value={String(field.value || "")}
+                      onValueChange={(val) => {
+                        const empId = val;
+                        console.log('Selected employeeId:', empId, typeof empId);
+                        field.onChange(empId);
+                        handleEmployeeChange(empId);
+                        setTimeout(() => {
+                          console.log('Form value after change:', form.getValues("employeeId"), typeof form.getValues("employeeId"));
+                        }, 100);
+                      }}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select employee" />
+                          <SelectValue placeholder={field.value ? undefined : "Select employee"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {isLoading ? (
-                          <SelectItem key="loading" value="loading">Loading employees...</SelectItem>
-                        ) : employees.length > 0 ? (
-                          employees.map((employee) => (
-                            <SelectItem key={employee._id} value={employee._id}>
-                              {employee.firstName} {employee.lastName}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem key="none" value="none">No employees available</SelectItem>
-                        )}
+                        <SelectItem key="static" value="static">Static Test</SelectItem>
+                        {(employees as any[])
+                          .filter(employee => !!(employee?.id || employee?._id))
+                          .map((employee: any) => {
+                            const empId = (employee.id || employee._id)?.toString();
+                            console.log('Rendering employee option:', empId, employee.firstName, employee.lastName);
+                            return (
+                              <SelectItem key={empId} value={empId}>
+                                {employee.firstName} {employee.lastName}
+                              </SelectItem>
+                            );
+                          })}
                       </SelectContent>
                     </Select>
                     <FormMessage />

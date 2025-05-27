@@ -39,39 +39,8 @@ const EmployeePayroll = () => {
     enabled: !!user,
   });
 
-  // Mock data for display
-  const mockPayslips: PayslipType[] = [
-    {
-      id: 1,
-      periodStart: "2023-05-01",
-      periodEnd: "2023-05-15",
-      payDate: "2023-05-20",
-      basicPay: 18000,
-      overtimePay: 1500,
-      deductions: { tax: 1950, sss: 800, philhealth: 400, pagibig: 200, others: 0 },
-      netPay: 16150,
-    },
-    {
-      id: 2,
-      periodStart: "2023-04-16",
-      periodEnd: "2023-04-30",
-      payDate: "2023-05-05",
-      basicPay: 18000,
-      overtimePay: 0,
-      deductions: { tax: 1800, sss: 800, philhealth: 400, pagibig: 200, others: 0 },
-      netPay: 14800,
-    },
-    {
-      id: 3,
-      periodStart: "2023-04-01",
-      periodEnd: "2023-04-15",
-      payDate: "2023-04-20",
-      basicPay: 18000,
-      overtimePay: 2250,
-      deductions: { tax: 2025, sss: 800, philhealth: 400, pagibig: 200, others: 300 },
-      netPay: 16525,
-    },
-  ];
+  // Use real payslips data from API
+  const realPayslips: PayslipType[] = Array.isArray(payslips) ? payslips : [];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PH', {
@@ -83,7 +52,7 @@ const EmployeePayroll = () => {
   // Generate a single PDF for all payslips
   const generateAllPayslipsPDF = async () => {
     const doc = new jsPDF();
-    mockPayslips.forEach((payslip, idx) => {
+    realPayslips.forEach((payslip, idx) => {
       if (idx > 0) doc.addPage();
       doc.setFontSize(16);
       doc.text(`Payslip for Pay Period: ${payslip.periodStart} - ${payslip.periodEnd}`, 10, 20);
@@ -110,7 +79,7 @@ const EmployeePayroll = () => {
     doc.setFontSize(12);
     let y = 30;
     let totalTax = 0, totalSSS = 0, totalPhilhealth = 0, totalPagibig = 0, totalOthers = 0;
-    mockPayslips.forEach((payslip) => {
+    realPayslips.forEach((payslip) => {
       totalTax += payslip.deductions.tax;
       totalSSS += payslip.deductions.sss;
       totalPhilhealth += payslip.deductions.philhealth;
@@ -161,7 +130,7 @@ const EmployeePayroll = () => {
         </div>
       </div>
 
-      {/* Earnings Summary Card */}
+      {/* Earnings Summary Card - now dynamic */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-gradient-to-br from-green-50 to-blue-50 border-green-100">
           <CardHeader className="pb-2">
@@ -171,14 +140,13 @@ const EmployeePayroll = () => {
           <CardContent>
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-2xl font-bold text-green-700">{formatCurrency(105000)}</p>
-                <p className="text-xs text-gray-500">+5.2% from last year</p>
+                <p className="text-2xl font-bold text-green-700">{formatCurrency(realPayslips.reduce((sum, p: any) => sum + (p.basicPay || 0) + (p.overtimePay || 0), 0))}</p>
+                <p className="text-xs text-gray-500">{realPayslips.length > 0 ? `Across ${realPayslips.length} payslips` : ''}</p>
               </div>
               <DollarSign className="h-8 w-8 text-green-400" />
             </div>
           </CardContent>
         </Card>
-
         <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Average Monthly</CardTitle>
@@ -187,14 +155,13 @@ const EmployeePayroll = () => {
           <CardContent>
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-2xl font-bold text-blue-700">{formatCurrency(30000)}</p>
-                <p className="text-xs text-gray-500">Across 3.5 months</p>
+                <p className="text-2xl font-bold text-blue-700">{formatCurrency(realPayslips.length > 0 ? realPayslips.reduce((sum, p: any) => sum + (p.basicPay || 0) + (p.overtimePay || 0), 0) / realPayslips.length : 0)}</p>
+                <p className="text-xs text-gray-500">{realPayslips.length > 0 ? `Across ${realPayslips.length} months` : ''}</p>
               </div>
               <Calendar className="h-8 w-8 text-blue-400" />
             </div>
           </CardContent>
         </Card>
-
         <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-100">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Overtime Earnings</CardTitle>
@@ -203,8 +170,8 @@ const EmployeePayroll = () => {
           <CardContent>
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-2xl font-bold text-purple-700">{formatCurrency(15750)}</p>
-                <p className="text-xs text-gray-500">15% of total earnings</p>
+                <p className="text-2xl font-bold text-purple-700">{formatCurrency(realPayslips.reduce((sum, p: any) => sum + (p.overtimePay || 0), 0))}</p>
+                <p className="text-xs text-gray-500">{realPayslips.length > 0 ? `${Math.round(100 * realPayslips.reduce((sum, p: any) => sum + (p.overtimePay || 0), 0) / (realPayslips.reduce((sum, p: any) => sum + (p.basicPay || 0) + (p.overtimePay || 0), 0) || 1))}% of total earnings` : ''}</p>
               </div>
               <Clock className="h-8 w-8 text-purple-400" />
             </div>
@@ -240,7 +207,9 @@ const EmployeePayroll = () => {
             </div>
           </div>
           
-          {mockPayslips.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-10 border rounded-md">Loading...</div>
+          ) : realPayslips.length === 0 ? (
             <div className="text-center py-10 border rounded-md">
               <DollarSign className="h-10 w-10 text-gray-400 mx-auto mb-2" />
               <h3 className="text-lg font-medium">No Payslips Available</h3>
@@ -255,11 +224,11 @@ const EmployeePayroll = () => {
                 <div className="col-span-2">Deductions</div>
                 <div className="col-span-2">Net Pay</div>
               </div>
-              {mockPayslips.map((payslip) => {
+              {realPayslips.map((payslip: any) => {
                 const totalDeductions = (Object.values(payslip.deductions) as number[]).reduce((sum, val) => sum + val, 0);
                 const grossPay = payslip.basicPay + payslip.overtimePay;
                 return (
-                  <div key={payslip.id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50 min-w-[900px]">
+                  <div key={payslip._id || payslip.id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50 min-w-[900px]">
                     <div className="col-span-4 flex items-center">
                       <Calendar className="h-4 w-4 mr-2 text-gray-500" />
                       <div>

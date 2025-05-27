@@ -24,16 +24,19 @@ const EmployeeDTR = () => {
   // Fetch employee DTRs
   const { data: dtrs, isLoading } = useQuery<DTR[]>({
     queryKey: ["/api/employee/dtrs"],
+    queryFn: async () => {
+      const res = await fetch("/api/employee/dtrs");
+      if (!res.ok) return [];
+      return await res.json();
+    },
     enabled: !!user,
   });
 
   // Filter DTRs based on search query and status
-  const filteredDtrs = dtrs ? dtrs.filter(dtr => {
+  const filteredDtrs = dtrs ? dtrs.filter((dtr: any) => {
     const matchesSearch = searchQuery === "" || 
       dtr.date.toLowerCase().includes(searchQuery.toLowerCase());
-    
     const matchesStatus = statusFilter === "all" || dtr.status === statusFilter;
-    
     return matchesSearch && matchesStatus;
   }) : [];
 
@@ -42,26 +45,15 @@ const EmployeeDTR = () => {
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
   
-  // Mock data for display
-  const mockDtrs = [
-    { id: 1, date: "2023-05-26", status: "Approved", timeIn: "08:00 AM", timeOut: "05:00 PM", hours: 8, type: "Regular" },
-    { id: 2, date: "2023-05-25", status: "Approved", timeIn: "08:15 AM", timeOut: "05:30 PM", hours: 8.25, type: "Regular" },
-    { id: 3, date: "2023-05-24", status: "Pending", timeIn: "08:00 AM", timeOut: "06:00 PM", hours: 9, type: "Overtime" },
-    { id: 4, date: "2023-05-23", status: "Rejected", timeIn: "09:00 AM", timeOut: "05:00 PM", hours: 7, type: "Regular" },
-    { id: 5, date: "2023-05-22", status: "Approved", timeIn: "08:00 AM", timeOut: "05:00 PM", hours: 8, type: "Regular" },
-    { id: 6, date: "2023-04-28", status: "Approved", timeIn: "08:00 AM", timeOut: "05:00 PM", hours: 8, type: "Regular" },
-    { id: 7, date: "2023-04-27", status: "Approved", timeIn: "08:00 AM", timeOut: "05:00 PM", hours: 8, type: "Regular" },
-  ];
-
-  const currentMonthDtrs = mockDtrs.filter(dtr => {
+  const currentMonthDtrs = filteredDtrs.filter((dtr: any) => {
     const dtrDate = new Date(dtr.date);
     return dtrDate.getMonth() === currentMonth && dtrDate.getFullYear() === currentYear;
   });
-
-  const historyDtrs = mockDtrs.filter(dtr => {
+  const historyDtrs = filteredDtrs.filter((dtr: any) => {
     const dtrDate = new Date(dtr.date);
     return dtrDate.getMonth() !== currentMonth || dtrDate.getFullYear() !== currentYear;
   });
+  const pendingDtrs = filteredDtrs.filter((dtr: any) => dtr.status === "Pending");
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -128,7 +120,9 @@ const EmployeeDTR = () => {
             </div>
             
             <TabsContent value="current" className="mt-0">
-              {currentMonthDtrs.length === 0 ? (
+              {isLoading ? (
+                <div className="text-center py-10 border rounded-md">Loading...</div>
+              ) : currentMonthDtrs.length === 0 ? (
                 <div className="text-center py-10 border rounded-md">
                   <Calendar className="h-10 w-10 text-gray-400 mx-auto mb-2" />
                   <h3 className="text-lg font-medium">No DTRs for Current Month</h3>
@@ -146,8 +140,8 @@ const EmployeeDTR = () => {
                     <div className="col-span-1">Actions</div>
                   </div>
                   
-                  {currentMonthDtrs.map((dtr) => (
-                    <div key={dtr.id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50">
+                  {currentMonthDtrs.map((dtr: any) => (
+                    <div key={dtr._id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50">
                       <div className="col-span-3 flex items-center">
                         <Calendar className="h-4 w-4 mr-2 text-gray-500" />
                         <span>
@@ -161,12 +155,12 @@ const EmployeeDTR = () => {
                       <div className="col-span-2">{dtr.timeIn}</div>
                       <div className="col-span-2">{dtr.timeOut}</div>
                       <div className="col-span-2">
-                        <span className={dtr.type === "Overtime" ? "text-blue-600 font-medium" : ""}>
-                          {dtr.hours}h
+                        <span className={dtr.type && dtr.type.toLowerCase() === "overtime" ? "text-blue-600 font-medium" : ""}>
+                          {(dtr.regularHours || 0) + (dtr.overtimeHours || 0)}h
                         </span>
-                        {dtr.type === "Overtime" && 
+                        {dtr.type && dtr.type.toLowerCase() === "overtime" && (
                           <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full ml-1.5">OT</span>
-                        }
+                        )}
                       </div>
                       <div className="col-span-2">
                         <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(dtr.status)}`}>
@@ -202,8 +196,8 @@ const EmployeeDTR = () => {
                     <div className="col-span-1">Actions</div>
                   </div>
                   
-                  {historyDtrs.map((dtr) => (
-                    <div key={dtr.id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50">
+                  {historyDtrs.map((dtr: any) => (
+                    <div key={dtr._id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50">
                       <div className="col-span-3 flex items-center">
                         <Calendar className="h-4 w-4 mr-2 text-gray-500" />
                         <span>
@@ -216,7 +210,14 @@ const EmployeeDTR = () => {
                       </div>
                       <div className="col-span-2">{dtr.timeIn}</div>
                       <div className="col-span-2">{dtr.timeOut}</div>
-                      <div className="col-span-2">{dtr.hours}h</div>
+                      <div className="col-span-2">
+                        <span className={dtr.type && dtr.type.toLowerCase() === "overtime" ? "text-blue-600 font-medium" : ""}>
+                          {(dtr.regularHours || 0) + (dtr.overtimeHours || 0)}h
+                        </span>
+                        {dtr.type && dtr.type.toLowerCase() === "overtime" && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full ml-1.5">OT</span>
+                        )}
+                      </div>
                       <div className="col-span-2">
                         <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(dtr.status)}`}>
                           {dtr.status}
@@ -234,7 +235,7 @@ const EmployeeDTR = () => {
             </TabsContent>
             
             <TabsContent value="pending" className="mt-0">
-              {mockDtrs.filter(dtr => dtr.status === "Pending").length === 0 ? (
+              {pendingDtrs.length === 0 ? (
                 <div className="text-center py-10 border rounded-md">
                   <AlertCircle className="h-10 w-10 text-gray-400 mx-auto mb-2" />
                   <h3 className="text-lg font-medium">No Pending DTRs</h3>
@@ -251,8 +252,8 @@ const EmployeeDTR = () => {
                     <div className="col-span-1">Actions</div>
                   </div>
                   
-                  {mockDtrs.filter(dtr => dtr.status === "Pending").map((dtr) => (
-                    <div key={dtr.id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50">
+                  {pendingDtrs.map((dtr: any) => (
+                    <div key={dtr._id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50">
                       <div className="col-span-3 flex items-center">
                         <Calendar className="h-4 w-4 mr-2 text-gray-500" />
                         <span>
@@ -266,12 +267,12 @@ const EmployeeDTR = () => {
                       <div className="col-span-2">{dtr.timeIn}</div>
                       <div className="col-span-2">{dtr.timeOut}</div>
                       <div className="col-span-2">
-                        <span className={dtr.type === "Overtime" ? "text-blue-600 font-medium" : ""}>
-                          {dtr.hours}h
+                        <span className={dtr.type && dtr.type.toLowerCase() === "overtime" ? "text-blue-600 font-medium" : ""}>
+                          {(dtr.regularHours || 0) + (dtr.overtimeHours || 0)}h
                         </span>
-                        {dtr.type === "Overtime" && 
+                        {dtr.type && dtr.type.toLowerCase() === "overtime" && (
                           <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full ml-1.5">OT</span>
-                        }
+                        )}
                       </div>
                       <div className="col-span-2">
                         <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(dtr.status)}`}>

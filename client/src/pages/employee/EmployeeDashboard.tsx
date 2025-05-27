@@ -13,38 +13,89 @@ import { useToast } from "@/hooks/use-toast";
 
 const EmployeeDashboard = () => {
   const { user } = useAuth();
-  const [showClockDialog, setShowClockDialog] = useState(false);
   const [showDTRDialog, setShowDTRDialog] = useState(false);
   const { toast } = useToast();
-  
-  // Fetch employee DTRs
-  const { data: dtrs, isLoading: isDtrsLoading } = useQuery({
-    queryKey: ["/api/employee/dtrs"],
-    enabled: !!user,
-  });
 
-  // Fetch employee payslips
-  const { data: payslips, isLoading: isPayslipsLoading } = useQuery({
-    queryKey: ["/api/employee/payslips"],
-    enabled: !!user,
-  });
-
-  // Fetch full employee profile for the logged-in user
-  const { data: employeeProfile } = useQuery({
-    queryKey: ["/api/employees", user?._id],
+  // Fetch employee profile
+  const { data: employeeProfile, isLoading: isProfileLoading } = useQuery({
+    queryKey: ["/api/employee/profile"],
     queryFn: async () => {
-      if (!user?._id) return null;
-      const res = await fetch(`/api/employees/${user._id}`);
+      const res = await fetch("/api/employee/profile");
       if (!res.ok) return null;
       return await res.json();
     },
-    enabled: !!user?._id,
+    enabled: !!user,
   });
+
+  // Fetch DTRs for current week
+  const { data: weekDTRs, isLoading: isWeekDTRsLoading } = useQuery({
+    queryKey: ["/api/employee/dtrs", "week"],
+    queryFn: async () => {
+      const res = await fetch("/api/employee/dtrs?week=current");
+      if (!res.ok) return [];
+      return await res.json();
+    },
+    enabled: !!user,
+  });
+
+  // Calculate weekly hours
+  const totalWeekHours = weekDTRs?.reduce((sum: number, dtr: any) => sum + (dtr.regularHours || 0) + (dtr.overtimeHours || 0), 0) || 0;
+  const requiredWeekHours = 40; // You can make this dynamic if needed
+  const remainingWeekHours = Math.max(requiredWeekHours - totalWeekHours, 0);
+  function formatHours(hours: number) {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return `${h}h ${m}m`;
+  }
+
+  // Fetch latest payslip
+  const { data: latestPayslip, isLoading: isPayslipLoading } = useQuery({
+    queryKey: ["/api/employee/payslip-latest"],
+    queryFn: async () => {
+      const res = await fetch("/api/employee/payslip-latest");
+      if (!res.ok) return null;
+      return await res.json();
+    },
+    enabled: !!user,
+  });
+
+  // Fetch recent DTRs
+  const { data: recentDTRs, isLoading: isRecentDTRsLoading } = useQuery({
+    queryKey: ["/api/employee/dtrs", "recent"],
+    queryFn: async () => {
+      const res = await fetch("/api/employee/dtrs?recent=1");
+      if (!res.ok) return [];
+      return await res.json();
+    },
+    enabled: !!user,
+  });
+
+  // Fetch notifications
+  const { data: notifications, isLoading: isNotificationsLoading } = useQuery({
+    queryKey: ["/api/employee/notifications"],
+    queryFn: async () => {
+      const res = await fetch("/api/employee/notifications");
+      if (!res.ok) return [];
+      return await res.json();
+    },
+    enabled: !!user,
+  });
+
+  function formatCurrency(amount: number) {
+    if (typeof amount !== "number") return "₱0.00";
+    return `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  }
+  function formatDate(date: string) {
+    if (!date) return "-";
+    return new Date(date).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold tracking-tight">Welcome, {user?.firstName}!</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {isProfileLoading ? "Loading..." : employeeProfile ? `Welcome, ${employeeProfile.firstName}!` : "Welcome!"}
+        </h1>
         <div className="flex gap-2">
           <Button size="sm" className="flex items-center gap-1" onClick={() => setShowDTRDialog(true)}>
             <FileText className="w-4 h-4" />
@@ -63,8 +114,12 @@ const EmployeeDashboard = () => {
           <CardContent>
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-2xl font-bold">32h 15m</p>
-                <p className="text-xs text-gray-500">7h 45m remaining</p>
+                <p className="text-2xl font-bold">
+                  {isWeekDTRsLoading ? "..." : formatHours(totalWeekHours)}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {isWeekDTRsLoading ? "..." : `${formatHours(remainingWeekHours)} remaining`}
+                </p>
               </div>
               <Calendar className="h-8 w-8 text-gray-400" />
             </div>
@@ -74,13 +129,17 @@ const EmployeeDashboard = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Latest Payslip</CardTitle>
-            <CardDescription>May 2023</CardDescription>
+            <CardDescription>{isPayslipLoading ? "Loading..." : latestPayslip ? formatDate(latestPayslip.payPeriodEnd || latestPayslip.periodEnd) : "No payslip available"}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-2xl font-bold">₱24,500.00</p>
-                <p className="text-xs text-gray-500">Paid on May 15, 2023</p>
+                <p className="text-2xl font-bold">
+                  {isPayslipLoading ? "..." : latestPayslip ? formatCurrency(latestPayslip.netPay) : "₱0.00"}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {isPayslipLoading ? "..." : latestPayslip && (latestPayslip.paymentDate || latestPayslip.payPeriodEnd || latestPayslip.periodEnd) ? `Paid on ${formatDate(latestPayslip.paymentDate || latestPayslip.payPeriodEnd || latestPayslip.periodEnd)}` : ""}
+                </p>
               </div>
               <Receipt className="h-8 w-8 text-gray-400" />
             </div>
@@ -95,32 +154,26 @@ const EmployeeDashboard = () => {
           <CardDescription>Your latest time records</CardDescription>
         </CardHeader>
         <CardContent>
-          {isDtrsLoading ? (
+          {isRecentDTRsLoading ? (
             <div className="text-center py-4">Loading...</div>
-          ) : (
+          ) : recentDTRs && recentDTRs.length > 0 ? (
             <div className="space-y-2">
-              {/* Sample DTR data */}
-              {[1, 2, 3].map((_, index) => (
-                <div key={index} className="flex justify-between items-center border-b pb-2">
+              {recentDTRs.map((dtr: any, index: number) => (
+                <div key={dtr.id || index} className="flex justify-between items-center border-b pb-2">
                   <div className="flex items-center gap-2">
                     <div className="bg-blue-100 p-2 rounded-full">
                       <FileText className="h-4 w-4 text-blue-600" />
                     </div>
                     <div>
                       <p className="font-medium text-sm">
-                        {new Date(2023, 4, 25 - index).toLocaleDateString("en-US", {
-                          weekday: "long",
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
+                        {formatDate(dtr.date)}
                       </p>
-                      <p className="text-xs text-gray-500">8:00 AM - 5:00 PM</p>
+                      <p className="text-xs text-gray-500">{dtr.timeIn} - {dtr.timeOut}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-sm">8h 00m</p>
-                    <p className="text-xs text-gray-500">Regular</p>
+                    <p className="font-medium text-sm">{formatHours((dtr.regularHours || 0) + (dtr.overtimeHours || 0))}</p>
+                    <p className="text-xs text-gray-500">{dtr.type || "Regular"}</p>
                   </div>
                 </div>
               ))}
@@ -130,6 +183,8 @@ const EmployeeDashboard = () => {
                 </Button>
               </div>
             </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500">No recent DTRs found.</div>
           )}
         </CardContent>
       </Card>
@@ -141,28 +196,26 @@ const EmployeeDashboard = () => {
           <CardDescription>Important updates</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex gap-3">
-              <div className="bg-yellow-100 p-2 rounded-full h-min">
-                <Bell className="h-4 w-4 text-yellow-600" />
-              </div>
-              <div>
-                <p className="font-medium text-sm">DTR Approval Required</p>
-                <p className="text-xs text-gray-500">Your DTR for May 24, 2023 needs manager approval.</p>
-                <p className="text-xs text-gray-400 mt-1">2 hours ago</p>
-              </div>
+          {isNotificationsLoading ? (
+            <div className="text-center py-4">Loading...</div>
+          ) : notifications && notifications.length > 0 ? (
+            <div className="space-y-4">
+              {notifications.map((notif: any, idx: number) => (
+                <div key={notif.id || idx} className="flex gap-3">
+                  <div className="bg-yellow-100 p-2 rounded-full h-min">
+                    <Bell className="h-4 w-4 text-yellow-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{notif.action.replace(/_/g, ' ')}</p>
+                    <p className="text-xs text-gray-500">{notif.description}</p>
+                    <p className="text-xs text-gray-400 mt-1">{formatDate(notif.timestamp)}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="flex gap-3">
-              <div className="bg-green-100 p-2 rounded-full h-min">
-                <Briefcase className="h-4 w-4 text-green-600" />
-              </div>
-              <div>
-                <p className="font-medium text-sm">Payslip for May is ready</p>
-                <p className="text-xs text-gray-500">Your payslip for the period of May 1-15, 2023 is now available.</p>
-                <p className="text-xs text-gray-400 mt-1">1 day ago</p>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500">No new notifications.</div>
+          )}
         </CardContent>
       </Card>
 

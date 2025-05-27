@@ -43,6 +43,21 @@ const PayslipView: React.FC<PayslipProps> = ({ payslip, onClose }) => {
     return <div className="p-6 text-center text-red-500">No payslip data available.</div>;
   }
 
+  // Support both legacy and new payroll data shapes
+  // If deductions is an array, sum it; otherwise, use the old fields
+  const deductionsArray = Array.isArray((payslip as any).deductions) ? (payslip as any).deductions : [];
+  const totalDeductions = deductionsArray.length > 0
+    ? deductionsArray.reduce((sum: any, d: any): any => sum + (d.amount || 0), 0)
+    : payslip.totalDeductions || 0;
+
+  const grossPay =
+    (typeof (payslip as any).basicPay === 'number' ? (payslip as any).basicPay : payslip.regularPay || 0) +
+    (typeof (payslip as any).overtimePay === 'number' ? (payslip as any).overtimePay : payslip.overtimePay || 0);
+
+  const netPay = typeof payslip.netPay === 'number'
+    ? payslip.netPay
+    : grossPay - totalDeductions;
+
   // Function to generate PDF data - would normally connect to an API
   const generatePDF = async () => {
     const doc = new jsPDF();
@@ -197,35 +212,18 @@ const PayslipView: React.FC<PayslipProps> = ({ payslip, onClose }) => {
               <TableBody>
                 <TableRow>
                   <TableCell>Regular Pay</TableCell>
-                  <TableCell className="text-right">{formatCurrency(payslip.regularPay)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency((payslip as any).basicPay ?? payslip.regularPay ?? 0)}</TableCell>
                 </TableRow>
-                {payslip.overtimePay > 0 && (
+                {(payslip as any).overtimePay > 0 && (
                   <TableRow>
                     <TableCell>Overtime Pay</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.overtimePay)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency((payslip as any).overtimePay)}</TableCell>
                   </TableRow>
                 )}
-                {payslip.holidayPay > 0 && (
-                  <TableRow>
-                    <TableCell>Holiday Pay</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.holidayPay)}</TableCell>
-                  </TableRow>
-                )}
-                {payslip.allowances > 0 && (
-                  <TableRow>
-                    <TableCell>Allowances</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.allowances)}</TableCell>
-                  </TableRow>
-                )}
-                {payslip.bonuses > 0 && (
-                  <TableRow>
-                    <TableCell>Bonuses</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.bonuses)}</TableCell>
-                  </TableRow>
-                )}
+                {/* Add more earnings if needed */}
                 <TableRow className="font-bold bg-gray-50">
                   <TableCell>Gross Pay</TableCell>
-                  <TableCell className="text-right">{formatCurrency(payslip.grossPay)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(grossPay)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -242,51 +240,21 @@ const PayslipView: React.FC<PayslipProps> = ({ payslip, onClose }) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payslip.sssDeduction > 0 && (
+                {deductionsArray.length > 0 ? (
+                  deductionsArray.map((ded: any, idx: any): any => (
+                    <TableRow key={idx}>
+                      <TableCell>{ded.description || ded.type}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(ded.amount)}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
                   <TableRow>
-                    <TableCell>SSS Contribution</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.sssDeduction)}</TableCell>
-                  </TableRow>
-                )}
-                {payslip.phicDeduction > 0 && (
-                  <TableRow>
-                    <TableCell>PhilHealth Contribution</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.phicDeduction)}</TableCell>
-                  </TableRow>
-                )}
-                {payslip.hdmfDeduction > 0 && (
-                  <TableRow>
-                    <TableCell>Pag-IBIG Contribution</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.hdmfDeduction)}</TableCell>
-                  </TableRow>
-                )}
-                {payslip.taxDeduction > 0 && (
-                  <TableRow>
-                    <TableCell>Withholding Tax</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.taxDeduction)}</TableCell>
-                  </TableRow>
-                )}
-                {payslip.loans > 0 && (
-                  <TableRow>
-                    <TableCell>Loans</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.loans)}</TableCell>
-                  </TableRow>
-                )}
-                {payslip.cashAdvances > 0 && (
-                  <TableRow>
-                    <TableCell>Cash Advances</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.cashAdvances)}</TableCell>
-                  </TableRow>
-                )}
-                {payslip.otherDeductions > 0 && (
-                  <TableRow>
-                    <TableCell>Other Deductions</TableCell>
-                    <TableCell className="text-right">{formatCurrency(payslip.otherDeductions)}</TableCell>
+                    <TableCell colSpan={2} className="text-center text-gray-400">No deductions</TableCell>
                   </TableRow>
                 )}
                 <TableRow className="font-bold bg-gray-50">
                   <TableCell>Total Deductions</TableCell>
-                  <TableCell className="text-right">{formatCurrency(payslip.totalDeductions)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(totalDeductions)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -297,7 +265,7 @@ const PayslipView: React.FC<PayslipProps> = ({ payslip, onClose }) => {
         <div className="bg-primary/10 p-4 rounded-md mt-4 print:mt-2">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-bold">Net Pay</h3>
-            <p className="text-2xl font-bold text-primary">{formatCurrency(payslip.netPay)}</p>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(netPay)}</p>
           </div>
         </div>
       </CardContent>

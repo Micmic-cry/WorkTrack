@@ -890,8 +890,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalRegularHours += dtr.regularHours;
             totalOvertimeHours += dtr.overtimeHours || 0;
           });
-          const regularPay = totalRegularHours * employee.salary;
-          const overtimePay = totalOvertimeHours * employee.salary * 1.25;
+          // Payroll calculation based on employee type
+          let regularPay = 0;
+          let overtimePay = 0;
+          if (employee.employeeType === 'Regular') {
+            // Pro-rate salary if period is not a full month
+            const periodStartDate = new Date(periodStart);
+            const periodEndDate = new Date(periodEnd);
+            const daysInPeriod = (periodEndDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24) + 1;
+            const daysInMonth = new Date(periodStartDate.getFullYear(), periodStartDate.getMonth() + 1, 0).getDate();
+            regularPay = employee.salary * (daysInPeriod / daysInMonth);
+            overtimePay = totalOvertimeHours * (employee.salary / daysInMonth / 8) * 1.25; // OT based on daily rate (calendar days, 8 hours/day)
+          } else {
+            // Project-based, Contract, or Hourly: pay is per hour
+            regularPay = totalRegularHours * employee.salary;
+            overtimePay = totalOvertimeHours * employee.salary * 1.25;
+          }
           const grossPay = regularPay + overtimePay;
           const taxDeduction = grossPay * 0.1; // 10% deduction for demo
           const sssDeduction = 0; // Add logic if needed
@@ -910,6 +924,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ],
             netPay: netPay,
             status: "Pending",
+            totalRegularHours,
+            totalOvertimeHours,
+            grossPay,
+            totalDeductions,
           };
           const payroll = await storage.createPayroll(payrollData);
           payrolls.push(payroll);
@@ -1001,6 +1019,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedPayroll);
     } catch (error) {
       res.status(500).json({ message: "Failed to mark payroll as paid" });
+    }
+  });
+
+  // --- Employee Dashboard API Endpoints ---
+  app.get("/api/employee/profile", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?._id;
+      if (!userId) return res.status(401).json({ message: "Not logged in" });
+      // Find employee by user email (assuming email is unique)
+      const employees = await storage.getAllEmployees();
+      const employee = employees.find(e => e.email === (req.user as any)?.email);
+      if (!employee) return res.status(404).json({ message: "Employee not found" });
+      res.json(employee);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch employee profile" });
+    }
+  });
+
+  app.get("/api/employee/dtrs", isAuthenticated, async (req, res) => {
+    try {
+      const employees = await storage.getAllEmployees();
+      const employee = employees.find(e => e.email === (req.user as any)?.email);
+      if (!employee) return res.status(404).json({ message: "Employee not found" });
+      const dtrs = await storage.getAllDTRs();
+      let result = dtrs.filter(dtr => String(dtr.employeeId) === String(employee.id || employee._id));
+      if (req.query.week === "current") {
+        // Filter for current week
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Monday
+        startOfWeek.setHours(0,0,0,0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setHours(23,59,59,999);
+        result = result.filter(dtr => {
+          const dtrDate = new Date(dtr.date);
+          return dtrDate >= startOfWeek && dtrDate <= endOfWeek;
+        });
+      }
+      if (req.query.recent) {
+        result = result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
+      }
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch DTRs" });
+    }
+  });
+
+  app.get("/api/employee/payslip-latest", isAuthenticated, async (req, res) => {
+    try {
+      const employees = await storage.getAllEmployees();
+      const employee = employees.find(e => e.email === (req.user as any)?.email);
+      if (!employee) return res.status(404).json({ message: "Employee not found" });
+      const payrolls = await storage.getAllPayrolls();
+      const empPayrolls = payrolls.filter(p => String(p.employeeId) === String(employee.id || employee._id));
+      if (empPayrolls.length === 0) return res.json(null);
+      const latest = empPayrolls.sort((a, b) => new Date(b.paymentDate || b.payPeriodEnd || b.periodEnd).getTime() - new Date(a.paymentDate || a.payPeriodEnd || a.periodEnd).getTime())[0];
+      res.json(latest);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch latest payslip" });
+    }
+  });
+
+  app.get("/api/employee/notifications", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?._id;
+      if (!userId) return res.status(401).json({ message: "Not logged in" });
+      const activities = await storage.getAllActivities();
+      // Only show activities for this user (or employee)
+      const userActivities = activities.filter(a => String(a.userId) === String(userId));
+      res.json(userActivities.slice(0, 10));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+  // --- END Employee Dashboard API Endpoints ---
+
+  // Change password endpoint for authenticated users
+  app.post("/api/users/change-password", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?._id;
+      const { currentPassword, newPassword } = req.body;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+      // Find user by ID
+      const user = await storage.getUserById ? await storage.getUserById(userId) : await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Check current password
+      const valid = await bcrypt.compare(currentPassword, user.password);
+      if (!valid) return res.status(400).json({ error: "Current password is incorrect" });
+
+      // Hash and update new password
+      const hashed = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(userId, { password: hashed });
+
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to change password" });
     }
   });
 
