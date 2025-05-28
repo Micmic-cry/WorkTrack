@@ -19,6 +19,8 @@ import type {
   InsertUnknownDtrFormat
 } from '@shared/schema';
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+import { format } from 'date-fns';
 
 // Helper function to convert MongoDB document to the expected type
 function convertToType<T extends { id: string }>(doc: any): T {
@@ -250,9 +252,10 @@ export class MongoDBStorage implements IStorage {
   async ensureAdminUser(): Promise<void> {
     const admin = await UserModel.findOne({ username: 'admin' });
     if (!admin) {
+      const hashedPassword = await bcrypt.hash('admin123', 10);
       await this.createUser({
         username: 'admin',
-        password: 'admin123',
+        password: hashedPassword,
         firstName: 'Admin',
         lastName: 'User',
         email: 'admin@worktrack.com',
